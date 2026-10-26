@@ -1,0 +1,15 @@
+# rpmlint findings on Fedora that are deliberate, with the reason for each.
+# Read by scripts/package.sh; rpmlint reports filters that match nothing.
+
+# DKMS builds the OpenRazer drivers from their sources on the user's
+# machine, and /usr/src is where DKMS expects them.
+addFilter("devel-file-in-non-devel-package .*/usr/src/")
+# The GPL texts are the ones the projects ship, old FSF address included.
+addFilter("incorrect-fsf-address")
+# udev rules, sysusers.d and modules-load.d files live in /usr/lib on
+# every distribution. They aren't binaries.
+addFilter("only-non-binary-in-usr-lib")
+# The documentation is in hyperflux-next-v2-linux. Full and the plugin
+# require it, and the driver package is installed as part of Full.
+addFilter("hyperflux-next-v2-(full|openrazer-driver-dkms).noarch: W: no-documentation")
+addFilter("hyperflux-next-v2-openrgb-plugin.x86_64: W: no-documentation")

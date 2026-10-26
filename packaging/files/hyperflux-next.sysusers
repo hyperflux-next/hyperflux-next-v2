@@ -1,0 +1,11 @@
+# The bridge runs as hyperflux-next and the device keeper as
+# hyperflux-keeper, each with a group of the same name. Nobody else may ever
+# join hyperflux-keeper: the patched OpenRazer drivers trust virtual devices
+# because only that group can create them. The hyperflux group may connect
+# to the sockets in /run/hyperflux-next: the bridge's, and the keeper's to
+# the bridge.
+u hyperflux-next - "HyperFlux Next V2 bridge" - -
+u hyperflux-keeper - "HyperFlux Next V2 device keeper" - -
+g hyperflux - -
+m hyperflux-next hyperflux
+m hyperflux-keeper hyperflux

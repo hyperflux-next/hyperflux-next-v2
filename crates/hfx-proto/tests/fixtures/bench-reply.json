@@ -1,0 +1,1 @@
+{"id":"r9","result":{"first_get_delay_us":5000,"get_interval_us":1000,"samples":[{"outcome":"ok","status":2,"elapsed_us":7412,"gets":1},{"outcome":"ok","status":2,"elapsed_us":8520,"gets":2},{"outcome":"no-response","status":null,"elapsed_us":46980,"gets":24}]}}

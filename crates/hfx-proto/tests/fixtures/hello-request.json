@@ -1,0 +1,1 @@
+{"id":"r1","method":"hello","params":{"client_id":"openrgb-feature-4211-9c3e7a10","client_name":"OpenRGB","min_version":1,"max_version":1,"required_features":["native-routes"],"optional_features":["wait"]}}

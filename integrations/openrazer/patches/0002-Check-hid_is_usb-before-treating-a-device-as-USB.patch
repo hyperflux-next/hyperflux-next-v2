@@ -1,0 +1,131 @@
+Check hid_is_usb() before treating a device as USB
+
+razeraccessory, razerkbd, razerkraken and razermouse take the parent of
+every HID device they probe for its USB interface. The device's bus field
+doesn't promise that: uhid lets whoever opens /dev/uhid choose the bus,
+and a uhid device's parent is the uhid misc device. A uhid device that
+says BUS_USB, with Razer's vendor id and a product id from one of the
+tables, would bind, and the probe would read the misc device as a struct
+usb_interface and that device's parent as a struct usb_device.
+
+Ask hid_is_usb() first, as the kernel's own HID drivers have since Linux
+5.16, and turn anything else away with -ENODEV. razeraccessory asks in its
+match callback too, which runs before the probe and reads the same parent.
+The other places that reach the parent (raw_event, input_configured,
+find_mouse, disconnect) only run for a device a probe accepted.
+
+razerkbd and razermouse still bind HyperFlux Next virtual devices through
+razer_can_bind(), which now asks hid_is_usb() instead of the bus field.
+Those devices have no input report, so raw_event and the input callbacks
+never run for them.
+
+Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1)
+after 0001.
+
+diff --git a/driver/razeraccessory_driver.c b/driver/razeraccessory_driver.c
+index 9c17c82..346b20a 100644
+--- a/driver/razeraccessory_driver.c
++++ b/driver/razeraccessory_driver.c
+@@ -2325,7 +2325,14 @@ static int razer_input_mapping(struct hid_device *hdev, struct hid_input *hi, st
+ static bool razer_accessory_match(struct hid_device *hdev, bool ignore_special_driver)
+ {
+     struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
++    struct usb_device *usb_dev;
++
++    // uhid can make a device that claims to be on USB; only usbhid's has
++    // a USB interface for a parent
++    if (!hid_is_usb(hdev))
++        return false;
++
++    usb_dev = interface_to_usbdev(intf);
+ 
+     switch (usb_dev->descriptor.idProduct) {
+     case USB_DEVICE_ID_RAZER_FIREFLY_V2:
+@@ -2357,9 +2364,16 @@ static int razer_accessory_probe(struct hid_device *hdev, const struct hid_devic
+     int retval = 0;
+     unsigned char expected_protocol = USB_INTERFACE_PROTOCOL_MOUSE;
+     struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
++    struct usb_device *usb_dev;
+     struct razer_accessory_device *dev = NULL;
+ 
++    // uhid can make a device that claims to be on USB; only usbhid's has
++    // a USB interface for a parent
++    if (!hid_is_usb(hdev))
++        return -ENODEV;
++
++    usb_dev = interface_to_usbdev(intf);
++
+     dev = kzalloc(sizeof(struct razer_accessory_device), GFP_KERNEL);
+     if(dev == NULL) {
+         dev_err(&intf->dev, "out of memory\n");
+diff --git a/driver/razercommon.c b/driver/razercommon.c
+index 4208a5e..fc4c271 100644
+--- a/driver/razercommon.c
++++ b/driver/razercommon.c
+@@ -350,12 +350,15 @@ static bool razer_is_hyperflux(struct hid_device *hdev)
+  * product. Bind a HyperFlux device only if the driver already lists its
+  * product id for USB, so the entry adds a transport but no devices.
+  * hdev->driver is the driver being probed.
++ *
++ * A USB device is one usbhid drives. The bus field isn't enough: uhid lets
++ * its user pick any bus, and a uhid device's parent isn't a USB interface.
+  */
+ bool razer_can_bind(struct hid_device *hdev)
+ {
+     const struct hid_device_id *id;
+ 
+-    if (hdev->bus == BUS_USB)
++    if (hid_is_usb(hdev))
+         return true;
+     if (!razer_is_hyperflux(hdev))
+         return false;
+diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
+index 5cad825..cd6692a 100644
+--- a/driver/razerkbd_driver.c
++++ b/driver/razerkbd_driver.c
+@@ -5030,7 +5030,7 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
+ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ {
+     int retval = 0;
+-    struct usb_interface *intf = hdev->bus == BUS_USB ? to_usb_interface(hdev->dev.parent) : NULL;
++    struct usb_interface *intf = hid_is_usb(hdev) ? to_usb_interface(hdev->dev.parent) : NULL;
+     struct usb_device *usb_dev = intf ? interface_to_usbdev(intf) : NULL;
+     struct razer_kbd_device *dev = NULL;
+ 
+diff --git a/driver/razerkraken_driver.c b/driver/razerkraken_driver.c
+index 551167d..a752b9c 100644
+--- a/driver/razerkraken_driver.c
++++ b/driver/razerkraken_driver.c
+@@ -740,9 +740,16 @@ static int razer_kraken_probe(struct hid_device *hdev, const struct hid_device_i
+ {
+     int retval = 0;
+     struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
++    struct usb_device *usb_dev;
+     struct razer_kraken_device *dev = NULL;
+ 
++    // uhid can make a device that claims to be on USB; only usbhid's has
++    // a USB interface for a parent
++    if (!hid_is_usb(hdev))
++        return -ENODEV;
++
++    usb_dev = interface_to_usbdev(intf);
++
+     dev = kzalloc(sizeof(struct razer_kraken_device), GFP_KERNEL);
+     if(dev == NULL) {
+         dev_err(&intf->dev, "out of memory\n");
+diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
+index bab2c10..c08602f 100644
+--- a/driver/razermouse_driver.c
++++ b/driver/razermouse_driver.c
+@@ -6089,7 +6089,7 @@ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interfac
+ static int razer_mouse_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ {
+     int retval = 0;
+-    struct usb_interface *intf = hdev->bus == BUS_USB ? to_usb_interface(hdev->dev.parent) : NULL;
++    struct usb_interface *intf = hid_is_usb(hdev) ? to_usb_interface(hdev->dev.parent) : NULL;
+     struct razer_mouse_device *dev = NULL;
+     unsigned char expected_subclass = 0xFF;
+ 

@@ -1,0 +1,21 @@
+Ask Razer keyboards for their layout with two argument bytes
+
+OpenRGB sends the keyboard-info query (class 0x00, command 0x86) with a
+data size of 0, while OpenRazer sends the same query with a data size of
+2. The bridge accepts each command only with the sizes in the device's
+command list, which is built from what OpenRazer sends, so OpenRGB's
+query would be refused before it reaches the keyboard. The two extra
+bytes are zero. Whether the keyboard itself cares about the size hasn't
+been checked; the command list does.
+
+--- a/Controllers/RazerController/RazerController/RazerController.cpp
++++ b/Controllers/RazerController/RazerController/RazerController.cpp
+@@ -1400,7 +1400,7 @@
+ 
+ void RazerController::razer_get_keyboard_info(unsigned char* layout, unsigned char* variant)
+ {
+-    struct razer_report report              = razer_create_report(0x00, RAZER_COMMAND_ID_GET_KEYBOARD_INFO, 0x00);
++    struct razer_report report              = razer_create_report(0x00, RAZER_COMMAND_ID_GET_KEYBOARD_INFO, 0x02);
+     struct razer_report response_report     = razer_create_response();
+ 
+     std::this_thread::sleep_for(1ms);

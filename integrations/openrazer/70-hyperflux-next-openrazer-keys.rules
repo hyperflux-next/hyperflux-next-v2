@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# openrazer-daemon finds the key presses that drive reactive effects such
+# as Ripple by matching the names in /dev/input/by-id against a pattern of
+# the keyboard's model, once, when it adds the keyboard. A keyboard paired
+# to a HyperFlux V2 receiver types through the receiver's interface 1,
+# whose names match none of those patterns. This gives that event node
+# one extra name per OpenRazer keyboard the receiver can carry. Each name
+# matches exactly one pattern, and the port path in it (ID_PATH_TAG, from
+# 60-persistent-input.rules) keeps two receivers apart.
+#
+# Interface 1 has three event nodes: keys, pointer and a third one. Only the
+# keyboard node (ID_INPUT_KEYBOARD, from 60-input-id.rules) carries key
+# presses. Naming all three would leave each link on whichever came last.
+#
+# The logged-in seat user gets access to the node, which means any of
+# their programs can read what is typed on the receiver's keyboard. uaccess
+# only takes effect before 73-seat-late.rules. A file of the same name in
+# /etc/udev/rules.d replaces this one.
+
+ACTION=="remove", GOTO="hyperflux_next_openrazer_keys_end"
+SUBSYSTEM!="input", GOTO="hyperflux_next_openrazer_keys_end"
+KERNEL!="event*", GOTO="hyperflux_next_openrazer_keys_end"
+ENV{ID_BUS}=="usb", ENV{ID_VENDOR_ID}=="1532", ENV{ID_MODEL_ID}=="00cf", ENV{ID_USB_INTERFACE_NUM}=="01", ENV{ID_INPUT_KEYBOARD}=="1", ENV{ID_PATH_TAG}=="?*", GOTO="hyperflux_next_openrazer_keys_link"
+GOTO="hyperflux_next_openrazer_keys_end"
+
+LABEL="hyperflux_next_openrazer_keys_link"
+TAG+="uaccess"
+# BlackWidow V3 Pro
+SYMLINK+="input/by-id/hyperflux-next-$env{ID_PATH_TAG}-Razer_Razer_BlackWidow_V3_Pro-if01-event-kbd"
+# DeathStalker V2 Pro
+SYMLINK+="input/by-id/hyperflux-next-$env{ID_PATH_TAG}-DSV2_Pro_000000000000-event-kbd"
+# DeathStalker V2 Pro TKL
+SYMLINK+="input/by-id/hyperflux-next-$env{ID_PATH_TAG}-DSV2Pro_TKL_000000000000-if01-event-mouse"
+# BlackWidow V4 Mini HyperSpeed
+SYMLINK+="input/by-id/hyperflux-next-$env{ID_PATH_TAG}-Razer_BlackWidow_V4_Mini_-if01-event-kbd"
+# BlackWidow V4 Tenkeyless HyperSpeed
+SYMLINK+="input/by-id/hyperflux-next-$env{ID_PATH_TAG}-Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed-if01-event-mouse"
+
+LABEL="hyperflux_next_openrazer_keys_end"

@@ -1,0 +1,14 @@
+# rpmlint findings on openSUSE that are deliberate, with the reason for
+# each. Read by scripts/package.sh; rpmlint reports filters that match
+# nothing.
+
+# DKMS builds the OpenRazer drivers from their sources on the user's
+# machine, and /usr/src is where DKMS expects them.
+addFilter("filelist-forbidden-fhs23 /usr/src/")
+addFilter("devel-file-in-non-devel-package .*/usr/src/")
+# The %service_* macros apply presets on install and restart on upgrade.
+# Installing never enables, starts or restarts the bridge, on any
+# distribution, but %systemd_preun still stops it on removal.
+addFilter("systemd-service-without-service_add_pre")
+addFilter("systemd-service-without-service_add_post")
+addFilter("systemd-service-without-service_del_postun")

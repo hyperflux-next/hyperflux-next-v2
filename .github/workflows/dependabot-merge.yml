@@ -1,0 +1,30 @@
+name: Dependabot merge
+
+# Dependabot's updates land on dev by themselves once every check the branch
+# requires has passed. An update that changes a major version waits for a
+# person, since that is where a dependency changes how it works. GitHub only
+# merges on its own into a branch that requires checks, which a free plan
+# offers for public repositories, so the job waits until this one is public.
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && !github.event.repository.private
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: update
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - name: Merge once the checks pass
+        if: steps.update.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR"

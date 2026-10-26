@@ -1,0 +1,23 @@
+[Unit]
+Description=HyperFlux Next V2 desktop socket for UID %i
+Documentation=man:hyperfluxctl(1)
+# The default dependencies made an ordering cycle at shutdown; the
+# Conflicts= and Before= lines below keep the part that's needed.
+DefaultDependencies=no
+PartOf=user-runtime-dir@%i.service
+Requires=hyperflux-next-bridge.service
+After=user-runtime-dir@%i.service hyperflux-next-bridge.service
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Socket]
+ListenStream=/run/user/%i/hyperflux-next-bridge.sock
+SocketMode=0600
+SocketUser=%i
+DirectoryMode=0700
+RemoveOnStop=yes
+Accept=no
+FlushPending=yes
+
+[Install]
+WantedBy=user-runtime-dir@%i.service

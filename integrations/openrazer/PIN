@@ -1,0 +1,6 @@
+# OpenRazer release the patches apply to. The checksum is of the GitHub
+# archive of the commit, which is also what package recipes download.
+OPENRAZER_REPO=https://github.com/openrazer/openrazer.git
+OPENRAZER_VERSION=3.12.4
+OPENRAZER_COMMIT=1ef8a91712906a89fd332a2ed62bbd105315d6d1
+OPENRAZER_SHA256=ffda843601ad4bfaf35a555dbe0c40d9dfbc6fe8df74033f3c2ab2216d14278b

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/hyperflux-next/hyperflux-next-v2/discussions
+    about: Running hyperfluxctl doctor first often answers it.
+  - name: Report a security problem privately
+    url: https://github.com/hyperflux-next/hyperflux-next-v2/security/advisories/new
+    about: Please don't post security problems in a public issue.

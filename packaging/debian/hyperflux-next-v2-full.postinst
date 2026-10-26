@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+# The new rules apply to /dev/uhid and the receiver at the next boot. The
+# install guides ask for one.
+if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
+    udevadm control --reload || true
+fi
+
+#DEBHELPER#
+
+exit 0

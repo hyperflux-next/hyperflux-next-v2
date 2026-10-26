@@ -1,0 +1,22 @@
+Clear the update flags before the device thread starts
+
+The device thread cleared CallFlag_UpdateLEDs and CallFlag_UpdateMode as
+its first action. An UpdateLEDs() or UpdateMode() issued right after the
+controller was constructed could set a flag before the thread got that
+far, and the thread then cleared it, so the first update was lost.
+Clearing the flags in the constructor, before the thread exists, closes
+that window.
+
+--- a/RGBController/RGBController.cpp
++++ b/RGBController/RGBController.cpp
+@@ -100,2 +100,4 @@
+     DeviceThreadRunning = true;
++    CallFlag_UpdateLEDs = false;
++    CallFlag_UpdateMode = false;
+     DeviceCallThread    = new std::thread(&RGBController::DeviceCallThreadFunction, this);
+@@ -2083,5 +2085,2 @@
+ {
+-    CallFlag_UpdateLEDs = false;
+-    CallFlag_UpdateMode = false;
+-
+     while(DeviceThreadRunning.load() == true)

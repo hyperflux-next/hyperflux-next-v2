@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
+    udevadm control --reload || true
+fi
+# The learned waits in the unit's StateDirectory=.
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/hyperflux-next
+fi
+
+#DEBHELPER#
+
+exit 0

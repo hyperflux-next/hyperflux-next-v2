@@ -1,0 +1,51 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: GPL-2.0-only
+
+include /usr/share/dpkg/pkg-info.mk
+
+# Debian's own OpenRGB 1.0 loads the plugin when it's built against Qt 5,
+# so Full depends on the plugin package. Ubuntu's OpenRGB is a snapshot
+# from before 1.0. There the plugin is built for OpenRGB 1.1 from
+# openrgb.org, whose trixie package runs on Ubuntu's own Qt 6. The plugin
+# package depends on that OpenRGB, and Full only recommends it.
+ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo yes),yes)
+QT := 6
+RELATIONS := -V'hfx:OpenRGB=openrgb (>= 1.1), openrgb (<< 1.2~)' \
+	-V'hfx:Full-Recommends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))'
+else
+QT := 5
+RELATIONS := -V'hfx:Full-Depends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))'
+endif
+
+HFX_MAKE := $(MAKE) OPENRAZER_GROUP=plugdev OPENRGB_QT=$(QT)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(HFX_MAKE) rust openrazer-tree crate-notices openrgb-plugin
+
+# The Rust, Python and C++ tests run in CI before anything is packaged.
+override_dh_auto_test:
+
+override_dh_auto_install:
+	$(HFX_MAKE) DESTDIR=$(CURDIR)/debian/hyperflux-next-v2-linux install-linux
+	$(HFX_MAKE) DESTDIR=$(CURDIR)/debian/hyperflux-next-v2-openrazer-driver-dkms install-openrazer-dkms
+	$(HFX_MAKE) DESTDIR=$(CURDIR)/debian/hyperflux-next-v2-full install-full
+	$(HFX_MAKE) DESTDIR=$(CURDIR)/debian/hyperflux-next-v2-openrgb-plugin install-openrgb-plugin
+
+override_dh_gencontrol:
+	dh_gencontrol -- $(RELATIONS)
+
+override_dh_installdocs:
+	dh_installdocs
+	dh_installdocs -phyperflux-next-v2-linux target/LICENSE-rust-crates
+
+# Nothing is enabled, started, stopped or restarted on install or upgrade.
+# The install guides tell people which units to enable.
+override_dh_installsystemd:
+	dh_installsystemd -phyperflux-next-v2-linux --no-enable --no-start --no-stop-on-upgrade \
+		hyperflux-next-bridge.service hyperflux-next-keeper.service
+
+# cargo already strips the Rust binaries; dwz has nothing to work on.
+override_dh_dwz:

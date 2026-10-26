@@ -1,0 +1,51 @@
+name: Device report
+description: A device that isn't listed, or a listed device that works or doesn't.
+labels: ["device"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Devices marked "not yet tested through the receiver" are the ones where a report helps most. A
+        `hyperfluxctl report` file and the checklist below are what it takes to move a device from checked to
+        tested, one feature at a time. Opening a report doesn't mean the device will be supported.
+  - type: input
+    id: model
+    attributes:
+      label: Device
+      description: The name it's sold under, and its firmware version from Synapse if you know it.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Report file
+      description: >-
+        Run `hyperfluxctl report` and follow the steps it prompts (about three minutes: leave the device alone,
+        use it, a mouse on and off the HyperFlux V2 mat, the cable in and out, and sleep and wake). It writes one
+        `hyperflux-next-report-*.json` file with the devices output, a capture, a bench run, Doctor, the receiver
+        probe and the bridge's and the device keeper's log lines for this boot, with no serial numbers and
+        receiver ids masked. Drag that file into this box. Key presses and pointer movement aren't recorded.
+    validations:
+      required: true
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What did you see through the receiver?
+      description: Only tick what you saw yourself; this is the part the file can't record.
+      options:
+        - label: It types or moves and clicks normally.
+        - label: Its battery in `hyperfluxctl battery` matches Synapse or the device's own indicator.
+        - label: Its battery level changed within an hour of use.
+        - label: Charging shows in `hyperfluxctl battery` while it charges.
+        - label: Its lighting changes from Polychromatic or another OpenRazer app.
+        - label: Its lighting changes from OpenRGB.
+        - label: Ripple lights the keys I press (keyboards).
+        - label: With its cable in, Polychromatic lists it once, not twice.
+        - label: Razer's HyperFlux V2 firmware updater was run for it.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: >-
+        What didn't work, and anything the checklist didn't cover. If `hyperfluxctl report` couldn't run, say what
+        it printed.

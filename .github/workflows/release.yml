@@ -1,0 +1,80 @@
+name: Release
+
+# A version tag builds all the packages from the tag, assembles the unsigned
+# package repository and opens a draft release with the CHANGELOG.md notes.
+# Signing and publishing happen on the maintainer's machine afterwards
+# (docs/maintainer/release.md).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CONTAINER_ENGINE: docker
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  packages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        target: [arch, ubuntu, debian, fedora, opensuse]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The tag names the version in Cargo.toml
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "tag $GITHUB_REF_NAME, version $version" >&2; exit 1; }
+      - name: Build, lint and install-test the ${{ matrix.target }} packages
+        run: scripts/package.sh "${{ matrix.target }}" --install-test
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-${{ matrix.target }}
+          path: dist/${{ matrix.target }}/
+
+  site:
+    needs: packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: packages-*
+          path: dist
+      - name: Name the package directories by target
+        run: for dir in dist/packages-*; do mv "$dir" "dist/${dir#dist/packages-}"; done
+      - name: The published site, to carry its release over
+        run: git clone --quiet --depth 1 --branch gh-pages "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" previous || mkdir previous
+      - name: Assemble the unsigned site
+        run: scripts/repo-assemble.sh site dist previous
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-unsigned
+          path: site/
+          include-hidden-files: true
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v v="## $version" '$0 == v {on = 1; next} /^## / {on = 0} on' CHANGELOG.md >notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no section for $version" >&2; exit 1; }
+          # A release page resolves relative links against its own address,
+          # so the CHANGELOG's links to files point at them in the tag.
+          sed -E -i "s#\]\(([^)#:][^):]*)\)#]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/\1)#g" notes.md
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
+            --title "HyperFlux Next V2 $version" --notes-file notes.md

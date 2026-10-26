@@ -1,0 +1,11 @@
+# OpenRGB sources the plugin is compiled against. A plugin only works in
+# the OpenRGB release whose headers it was built with, so each supported
+# release has its own pin. The checksums are of the GitHub archive of the
+# commit, which is also what package recipes download.
+OPENRGB_REPO=https://github.com/CalcProgrammer1/OpenRGB.git
+OPENRGB_QT6_VERSION=1.1
+OPENRGB_QT6_COMMIT=8e16de27858cf2be6af54a33ce003df74cb9fd3e
+OPENRGB_QT6_SHA256=92839b6703e2ff1355adb374dfc92666489fcbe3ac2ed721fa6f0ef1e44845c1
+OPENRGB_QT5_VERSION=1.0
+OPENRGB_QT5_COMMIT=81bbe18a84c2e507006f19dd252e397e40a56bfe
+OPENRGB_QT5_SHA256=b23e465818871eba1b9ff119e1d8ec8d25a0fdc490ca103df5f8f06f529f863f

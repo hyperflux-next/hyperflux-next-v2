@@ -1,0 +1,25 @@
+# The bridge talks to the receiver through its hidraw interfaces 0 and 4.
+# The device keeper reads interfaces 0 and 1, and makes the battery devices
+# and the virtual devices OpenRazer drives through /dev/uhid. Everyone else
+# goes through the bridge's sockets. Never add a person to the keeper's
+# group: the patched OpenRazer drivers trust virtual devices because nobody
+# else can make one.
+
+KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="hyperflux-keeper", MODE="0660", OPTIONS+="static_node=uhid"
+
+# Only interfaces 0 (feature exchanges and the mouse's movement), 1 (status
+# reports among the keys) and 4 (pairing list). Interfaces 2 and 3 carry
+# nothing either needs, so neither gets access to them. udev matches all
+# ATTRS keys of one rule against the same parent device, and the ids sit on
+# the USB device while the interface number sits on the interface, so the
+# two checks are separate rules.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1532", ATTRS{idProduct}=="00cf", GOTO="hyperflux_next_receiver"
+GOTO="hyperflux_next_end"
+LABEL="hyperflux_next_receiver"
+# A node has one group, and interface 0 has two users: the bridge reads and
+# writes it as the node's owner, the keeper's group only reads it. That
+# needs no ACL tool, which most distributions don't install by default.
+ATTRS{bInterfaceNumber}=="00", OWNER="hyperflux-next", GROUP="hyperflux-keeper", MODE="0640"
+ATTRS{bInterfaceNumber}=="01", GROUP="hyperflux-keeper", MODE="0640"
+ATTRS{bInterfaceNumber}=="04", GROUP="hyperflux-next", MODE="0660"
+LABEL="hyperflux_next_end"

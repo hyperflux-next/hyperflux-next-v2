@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# What the HyperFlux Next V2 device keeper needs on top of the core rules to
+# hold the virtual devices that the patched razerkbd and razermouse bind.
+# The drivers trust such a device because nobody but the keeper can create
+# one: the core package gives /dev/uhid to the hyperflux-keeper group.
+# Never add a person to that group.
+
+# The keeper unbinds the driver from a virtual device before destroying it,
+# which lets a read that is in progress complete instead of failing with
+# EIO. The bind files stay root-only.
+ACTION=="add", SUBSYSTEM=="drivers", DEVPATH=="/bus/hid/drivers/*", KERNEL=="razeraccessory|razerkbd|razerkraken|razermouse", \
+    RUN+="/usr/bin/chgrp hyperflux-keeper /sys%p/unbind", RUN+="/usr/bin/chmod 0220 /sys%p/unbind"

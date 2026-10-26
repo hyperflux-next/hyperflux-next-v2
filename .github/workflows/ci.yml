@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CONTAINER_ENGINE: docker
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      - name: Format and clippy
+        run: make lint
+      - name: Tests
+        run: cargo test --workspace --locked
+      - name: Release build
+        run: make rust
+      - name: Binary size
+        run: scripts/size-check.sh
+      - name: Bridge and keeper memory with the simulator
+        run: scripts/rss-check.sh
+      - name: Bridge and keeper wake-ups while idle
+        run: scripts/idle-check.sh
+
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake fish g++ groff-base python3-pytest shellcheck zsh
+      - name: Cross-checks, versions and docs
+        run: python3 -m pytest -q tests
+      - name: Man page and shell completions
+        run: make cli-test
+      - name: SDK tests
+        run: make sdk-test
+      - name: Lines of code
+        run: scripts/loc-check.sh
+      - name: Packaging files
+        run: make lint-packaging
+
+  openrazer-kernels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        kernel: ["6.1", "6.6", "6.12", latest]
+    name: openrazer (Linux ${{ matrix.kernel }})
+    env:
+      # The tree has no vmlinux, so modpost can't resolve kernel symbols.
+      KBUILD_MODPOST_WARN: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc bison flex libelf-dev libssl-dev python3-pytest
+      - name: Prepare Linux ${{ matrix.kernel }}
+        run: scripts/kernel-tree.sh "${{ matrix.kernel }}" "$RUNNER_TEMP/linux"
+      - name: Patched OpenRazer drivers
+        run: make openrazer-test KDIR="$RUNNER_TEMP/linux"
+
+  openrgb-plugin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # OpenRGB 1.1 with Qt 6, as on Arch; OpenRGB 1.0 with Qt 5, as on Debian.
+          - qt: 6
+            image: docker.io/library/archlinux:base-devel
+            setup: pacman -Syu --noconfirm --needed cmake git openrgb python qt6-base ttf-dejavu
+          - qt: 5
+            image: docker.io/library/debian:forky
+            setup: >-
+              apt-get update && apt-get install -y --no-install-recommends ca-certificates cmake curl g++
+              fonts-dejavu-core git make openrgb patch pkgconf python3 qtbase5-dev
+    name: openrgb-plugin (Qt ${{ matrix.qt }})
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install OpenRGB and build tools
+        run: ${{ matrix.setup }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: make openrgb-plugin OPENRGB_QT=${{ matrix.qt }}
+      - name: Tests
+        run: make openrgb-test OPENRGB_QT=${{ matrix.qt }}
+      - name: OpenRGB loads the plugin
+        run: make openrgb-load-test OPENRGB_QT=${{ matrix.qt }}
+
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      packaging: ${{ steps.diff.outputs.packaging }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        name: Did anything the packages are made from change?
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo packaging=true >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE...HEAD" | grep -qE \
+            '^(packaging/|systemd/|udev/|man/|integrations/|Makefile$|Cargo\.lock$|.*\.mk$|crates/[^/]+/Cargo\.toml$|crates/hyperfluxctl/completions/|scripts/(package|install-test)\.sh$|scripts/crate-notices\.py$|\.github/workflows/ci\.yml$)'
+          then
+            echo packaging=true >>"$GITHUB_OUTPUT"
+          else
+            echo packaging=false >>"$GITHUB_OUTPUT"
+          fi
+
+  packages:
+    needs: changes
+    if: needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [arch, ubuntu, debian, fedora, opensuse]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build, lint and install-test the ${{ matrix.target }} packages
+        run: scripts/package.sh "${{ matrix.target }}" --install-test
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-${{ matrix.target }}
+          path: dist/${{ matrix.target }}/
+          retention-days: 14

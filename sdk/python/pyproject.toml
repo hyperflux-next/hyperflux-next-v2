@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyperflux-next-sdk"
+version = "1.0.0"
+description = "Read-only client for the HyperFlux Next V2 bridge"
+license = "GPL-2.0-only"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+packages = ["hyperflux_sdk"]

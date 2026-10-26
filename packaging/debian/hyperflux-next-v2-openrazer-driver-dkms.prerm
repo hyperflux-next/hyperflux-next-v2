@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+remove|upgrade|deconfigure)
+    if [ -n "$(dkms status -m openrazer-driver -v 3.12.4)" ]; then
+        dkms remove -m openrazer-driver -v 3.12.4 --all
+    fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

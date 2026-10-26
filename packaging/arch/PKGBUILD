@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Maintainer: offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>
+#
+# Builds the HyperFlux Next V2 packages from the release tarball and the
+# pinned OpenRazer and OpenRGB archives. Nothing here depends on the rest of
+# the repository: the same file works on the AUR.
+#
+# The tarball checksum is SKIP in the repository because this file is part
+# of that tarball. The AUR copy gets the real one from updpkgsums.
+
+pkgbase=hyperflux-next-v2
+pkgname=(hyperflux-next-v2-linux hyperflux-next-v2-openrazer-driver-dkms hyperflux-next-v2-full
+         hyperflux-next-v2-openrgb-plugin)
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+url='https://github.com/hyperflux-next/hyperflux-next-v2'
+license=('GPL-2.0-only')
+makedepends=('cargo' 'cmake' 'patch' 'python' 'qt6-base')
+checkdepends=('python-pytest')
+options=('!lto' '!debug')
+_openrazer_version=3.12.4
+_openrazer_commit=1ef8a91712906a89fd332a2ed62bbd105315d6d1
+_openrgb_commit=8e16de27858cf2be6af54a33ce003df74cb9fd3e
+_srcdir=hyperflux-next-v2-$pkgver
+source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
+        "openrazer-$_openrazer_commit.tar.gz::https://github.com/openrazer/openrazer/archive/$_openrazer_commit.tar.gz"
+        "openrgb-$_openrgb_commit.tar.gz::https://github.com/CalcProgrammer1/OpenRGB/archive/$_openrgb_commit.tar.gz")
+noextract=("openrazer-$_openrazer_commit.tar.gz" "openrgb-$_openrgb_commit.tar.gz")
+sha256sums=('SKIP'
+            'ffda843601ad4bfaf35a555dbe0c40d9dfbc6fe8df74033f3c2ab2216d14278b'
+            '92839b6703e2ff1355adb374dfc92666489fcbe3ac2ed721fa6f0ef1e44845c1')
+
+# Arch packages OpenRazer with the openrazer group. The CLI is built with
+# the same group so Doctor checks the right one.
+_make() {
+  make -C "$srcdir/$_srcdir" OPENRAZER_GROUP=openrazer OPENRGB_QT=6 CARGO_FLAGS=--frozen "$@"
+}
+
+prepare() {
+  cd "$_srcdir"
+  export RUSTUP_TOOLCHAIN=stable
+  # Every crate in Cargo.lock: the crate notices read them all.
+  cargo fetch --locked
+  # The fetch scripts check and patch the archives makepkg downloaded.
+  OPENRAZER_ARCHIVE="$srcdir/openrazer-$_openrazer_commit.tar.gz" _make openrazer-tree
+}
+
+build() {
+  export RUSTUP_TOOLCHAIN=stable
+  OPENRGB_ARCHIVE="$srcdir/openrgb-$_openrgb_commit.tar.gz" _make rust openrgb-plugin crate-notices
+}
+
+check() {
+  export RUSTUP_TOOLCHAIN=stable
+  _make test-rust test-tables
+}
+
+# The packages take over from the hyperflux-next-* names of 2.x and of the
+# 1:1.0.0 test build. Core also replaces the receiver kernel modules of 2.x
+# (hyperflux-next-dkms) and of the pre-release (hyperflux-v2-linux-dkms):
+# it reaches the receiver through hidraw.
+package_hyperflux-next-v2-linux() {
+  pkgdesc='HyperFlux Next V2 bridge, CLI and base services for the Razer HyperFlux V2 receiver'
+  license=('GPL-2.0-only' 'MIT OR Apache-2.0')
+  depends=('glibc' 'libgcc' 'systemd')
+  provides=("hyperflux-next-linux=$pkgver" "hyperflux-next-dkms=$pkgver")
+  conflicts=('hyperflux-next-linux' 'hyperflux-next-dkms' 'hyperflux-v2-linux-dkms')
+  replaces=('hyperflux-next-linux' 'hyperflux-next-dkms' 'hyperflux-v2-linux-dkms')
+
+  _make DESTDIR="$pkgdir" install-linux
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" "$srcdir/$_srcdir/LICENSE" "$srcdir/$_srcdir/target/LICENSE-rust-crates"
+}
+
+package_hyperflux-next-v2-openrazer-driver-dkms() {
+  pkgdesc='OpenRazer kernel driver sources with the HyperFlux Next V2 transport, for DKMS'
+  arch=('any')
+  license=('GPL-2.0-or-later' 'GPL-2.0-only')
+  depends=('dkms' 'systemd')
+  provides=("openrazer-driver-dkms=$_openrazer_version" "hyperflux-openrazer-driver-abi=$_openrazer_version"
+            "hyperflux-next-openrazer-driver-dkms=$pkgver")
+  conflicts=('openrazer-driver-dkms' 'hyperflux-next-openrazer-driver-dkms')
+  replaces=('hyperflux-next-openrazer-driver-dkms')
+
+  _make DESTDIR="$pkgdir" install-openrazer-dkms
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" "$srcdir/$_srcdir/LICENSE"
+}
+
+# Arch's own OpenRGB loads the plugin, so Full brings it along.
+package_hyperflux-next-v2-full() {
+  pkgdesc='HyperFlux Next V2 Core plus OpenRazer and OpenRGB support for the paired devices'
+  arch=('any')
+  depends=('systemd'
+           "hyperflux-next-v2-linux=$pkgver-$pkgrel"
+           "hyperflux-next-v2-openrazer-driver-dkms=$pkgver-$pkgrel"
+           "hyperflux-next-v2-openrgb-plugin=$pkgver-$pkgrel")
+  provides=("hyperflux-next-full=$pkgver")
+  conflicts=('hyperflux-next-full')
+  replaces=('hyperflux-next-full')
+  optdepends=('openrazer-daemon: the stock OpenRazer service'
+              'python-openrazer: the OpenRazer Python client'
+              'polychromatic: the OpenRazer desktop app (AUR)')
+
+  _make DESTDIR="$pkgdir" install-full
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" "$srcdir/$_srcdir/LICENSE"
+}
+
+# Built for Arch's OpenRGB 1.1, and rebuilt when Arch moves on. A version
+# bound on openrgb would hold back everyone's system upgrade until then.
+# The weekly install test loads the plugin into Arch's newest OpenRGB.
+package_hyperflux-next-v2-openrgb-plugin() {
+  pkgdesc='HyperFlux Next V2 plugin for OpenRGB: the paired devices and their batteries'
+  license=('GPL-2.0-only' 'MIT')
+  depends=('glibc' 'libgcc' 'libstdc++' 'qt6-base' "hyperflux-next-v2-linux=$pkgver-$pkgrel")
+  optdepends=('openrgb: OpenRGB 1.1, which loads the plugin')
+
+  _make DESTDIR="$pkgdir" install-openrgb-plugin
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" "$srcdir/$_srcdir/LICENSE"
+}

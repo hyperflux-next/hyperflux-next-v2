@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-only
+"""set-version [--root DIR] X.Y.Z
+
+Sets the product version everywhere it's written down: the workspace
+Cargo.toml and Cargo.lock, the OpenRGB plugin, both SDKs and the three
+package recipes. It also adds Debian and RPM changelog entries and an
+empty CHANGELOG.md section for the release notes. tests/test_versions.py
+checks that all these places agree."""
+
+import email.utils
+import re
+import sys
+import time
+from pathlib import Path
+
+PACKAGER = "offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>"
+# (file, pattern); group 1 is what comes before the version.
+LINES = [
+    ("Cargo.toml", r'(?m)^(version = ")[^"]*'),
+    ("Cargo.lock", r'(name = "(?:hfx-proto|hfx-bridge|hyperfluxctl)"\nversion = ")[^"]*'),
+    ("integrations/openrgb/CMakeLists.txt", r"(project\(hyperflux-next-openrgb\s+VERSION )[0-9.]+"),
+    ("sdk/cpp/CMakeLists.txt", r"(project\(hyperflux-sdk\s+VERSION )[0-9.]+"),
+    ("sdk/python/pyproject.toml", r'(?m)^(version = ")[^"]*'),
+    ("packaging/arch/PKGBUILD", r"(?m)^(pkgver=).*"),
+    ("packaging/rpm/hyperflux-next-v2.spec", r"(?m)^(Version:\s+).*"),
+]
+
+
+def rewrite(path, change):
+    path.write_text(change(path.read_text()))
+
+
+def main(argv):
+    root = Path(__file__).resolve().parent.parent
+    if argv[:1] == ["--root"]:
+        root, argv = Path(argv[1]), argv[2:]
+    if len(argv) != 1 or not re.fullmatch(r"\d+\.\d+\.\d+", argv[0]):
+        sys.exit(__doc__.split("\n\n")[0])
+    version = argv[0]
+
+    for name, pattern in LINES:
+        if not (root / name).exists():
+            print(f"set-version: skipping {name}, which isn't in this tree")
+            continue
+        rewrite(root / name, lambda t, p=pattern: re.sub(p, lambda m: m.group(1) + version, t))
+    rewrite(root / "packaging/arch/PKGBUILD", lambda t: re.sub(r"(?m)^pkgrel=.*", "pkgrel=1", t))
+
+    now = time.time()
+    debian = root / "packaging/debian/changelog"
+    if not debian.read_text().startswith(f"hyperflux-next-v2 ({version}-1) "):
+        rewrite(debian, lambda t: (
+            f"hyperflux-next-v2 ({version}-1) unstable; urgency=medium\n\n"
+            f"  * HyperFlux Next V2 {version}.\n\n"
+            f" -- {PACKAGER}  {email.utils.formatdate(now)}\n\n{t}"))
+
+    spec = root / "packaging/rpm/hyperflux-next-v2.spec"
+    entry = f"* {time.strftime('%a %b %d %Y', time.gmtime(now))} {PACKAGER} - {version}-1\n"
+    if f" - {version}-1\n" not in spec.read_text():
+        rewrite(spec, lambda t: re.sub(r"(?m)^Release:.*", "Release:        1%{?dist}", t)
+                .replace("%changelog\n", f"%changelog\n{entry}- HyperFlux Next V2 {version}\n\n", 1))
+
+    changelog = root / "CHANGELOG.md"
+    text = changelog.read_text()
+    if not re.search(rf"(?m)^## {re.escape(version)}$", text):
+        head, sep, rest = text.partition("\n## ")
+        changelog.write_text(f"{head}\n## {version}\n\n## {rest}" if sep
+                             else f"{text.rstrip()}\n\n## {version}\n")
+    print(f"Version {version} set. Write its section in CHANGELOG.md before tagging.")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

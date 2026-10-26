@@ -1,0 +1,655 @@
+Let razerkbd and razermouse drive HyperFlux Next virtual devices
+
+HyperFlux Next presents each wireless Razer device paired to a HyperFlux
+V2 receiver as a uhid device with a single 90-byte feature report. Its
+device keeper creates the device, and the bridge answers the reports.
+With this change the two drivers bind such a device and send it the
+reports they would send over USB, as a feature SET and GET.
+
+A virtual device is only taken when it is on the virtual bus, from
+vendor 0x1532, with HyperFlux Next's phys prefix and report descriptor,
+and with a product id the driver already lists for USB. HyperFlux Next's
+udev rules leave /dev/uhid to the hyperflux-keeper group.
+
+The bridge reports a missing response in-band ("HFXNERR1"). The drivers
+return it as EAGAIN (not sent) or ENOTRECOVERABLE (may have been sent), a
+mismatched response as ENOTRECOVERABLE, and for these devices the sysfs
+handlers return the first error instead of ignoring it.
+
+Nothing sends the device-mode command or touches autosuspend without a
+USB device. Both modules carry hyperflux_native_transport, as a modinfo
+tag and as a read-only parameter.
+
+99-razer.rules gains bind-time rules, since its USB-based rules never
+match a virtual device. The group stays plugdev; packaging substitutes
+it.
+
+Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1).
+
+diff --git a/driver/razercommon.c b/driver/razercommon.c
+index 4e8548a..4208a5e 100644
+--- a/driver/razercommon.c
++++ b/driver/razercommon.c
+@@ -220,6 +220,10 @@ int razer_send_control_msg_old_device(struct usb_device *usb_dev,void const *dat
+     char *buf;
+     int len;
+ 
++    // A HyperFlux device has no usb_dev, and this path isn't routed to the bridge
++    if (!usb_dev)
++        return -ENODEV;
++
+     buf = kmemdup(data, report_size, GFP_KERNEL);
+     if (buf == NULL)
+         return -ENOMEM;
+@@ -291,3 +295,129 @@ int razer_send_argb_msg(struct usb_device* usb_dev, unsigned char channel, unsig
+ 
+     return ((len < 0) ? len : ((len != size) ? -EIO : 0));
+ }
++
++/*
++ * HyperFlux Next virtual devices
++ *
++ * HyperFlux Next creates a uhid device for each wireless Razer device paired
++ * to a HyperFlux V2 receiver and carries its 90-byte feature reports through
++ * the receiver. razerkbd and razermouse bind it as if it were the wireless
++ * device's own USB control interface and exchange each report with a
++ * feature SET followed by a feature GET.
++ *
++ * HyperFlux Next's udev rules give /dev/uhid to the hyperflux-keeper group,
++ * which only its device keeper is in, so a virtual-bus device with this phys
++ * prefix and this exact report descriptor came from HyperFlux Next. It has
++ * one feature report and no input reports, so the drivers' raw_event and
++ * input code, which expect a USB parent, never run for such a device.
++ */
++#define RAZER_HYPERFLUX_PHYS_PREFIX "hyperflux-next/native/v1/"
++
++static const u8 razer_hyperflux_rdesc[] = {
++    0x06, 0x00, 0xff, /* Usage Page (0xff00) */
++    0x09, 0x01, /* Usage (1) */
++    0xa1, 0x01, /* Collection (Application) */
++    0x15, 0x00, /* Logical Minimum (0) */
++    0x26, 0xff, 0x00, /* Logical Maximum (255) */
++    0x75, 0x08, /* Report Size (8) */
++    0x95, 0x5a, /* Report Count (90) */
++    0xb1, 0x02, /* Feature (Data, Var, Abs) */
++    0xc0, /* End Collection */
++};
++
++static bool razer_is_hyperflux(struct hid_device *hdev)
++{
++    size_t prefix_len = strlen(RAZER_HYPERFLUX_PHYS_PREFIX);
++    const char *label = hdev->phys + prefix_len;
++
++    if (hdev->bus != BUS_VIRTUAL || hdev->vendor != USB_VENDOR_ID_RAZER ||
++        strncmp(hdev->phys, RAZER_HYPERFLUX_PHYS_PREFIX, prefix_len) ||
++        hdev->dev_rsize != sizeof(razer_hyperflux_rdesc) ||
++        memcmp(hdev->dev_rdesc, razer_hyperflux_rdesc, sizeof(razer_hyperflux_rdesc)))
++        return false;
++
++    if (!*label)
++        return false;
++    for (; *label; label++) {
++        if ((*label < 'a' || *label > 'z') && (*label < '0' || *label > '9') && *label != '-')
++            return false;
++    }
++    return true;
++}
++
++/*
++ * razerkbd and razermouse list one virtual-bus entry that matches any Razer
++ * product. Bind a HyperFlux device only if the driver already lists its
++ * product id for USB, so the entry adds a transport but no devices.
++ * hdev->driver is the driver being probed.
++ */
++bool razer_can_bind(struct hid_device *hdev)
++{
++    const struct hid_device_id *id;
++
++    if (hdev->bus == BUS_USB)
++        return true;
++    if (!razer_is_hyperflux(hdev))
++        return false;
++    for (id = hdev->driver->id_table; id->bus; id++) {
++        if (id->bus == BUS_USB && id->vendor == hdev->vendor && id->product == hdev->product)
++            return true;
++    }
++    return false;
++}
++
++/*
++ * When the bridge has no response to give, it still answers the GET, with
++ * "HFXNERR1", version 1, the kind of failure, zeros and 0x5a 0xa5, because
++ * uhid turns every GET error into EIO and userspace should know whether the
++ * report may have reached the device.
++ */
++static int razer_hyperflux_error(const struct razer_report *report)
++{
++    const u8 *bytes = (const u8 *)report;
++
++    if (memcmp(bytes, "HFXNERR1", 8) || bytes[8] != 1 ||
++        memchr_inv(bytes + 10, 0, 78) || bytes[88] != 0x5a || bytes[89] != 0xa5)
++        return 0;
++
++    switch (bytes[9]) {
++    case 1:
++        return RAZER_HYPERFLUX_NOT_SENT;
++    case 2:
++        return RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT;
++    }
++    return 0;
++}
++
++/*
++ * No sleep between SET and GET: the bridge acknowledges the SET straight
++ * away and holds the GET until the receiver has answered. uhid reports a
++ * refused SET and a timed-out one alike, so any failure here may have
++ * reached the device.
++ */
++int razer_hyperflux_get_report(struct hid_device *hdev, struct razer_report *request, struct razer_report *response)
++{
++    int len, err;
++
++    len = hid_hw_raw_request(hdev, 0, (u8 *)request, RAZER_USB_REPORT_LEN,
++                             HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
++    if (len != RAZER_USB_REPORT_LEN)
++        return RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT;
++
++    memset(response, 0, sizeof(*response));
++    len = hid_hw_raw_request(hdev, 0, (u8 *)response, RAZER_USB_REPORT_LEN,
++                             HID_FEATURE_REPORT, HID_REQ_GET_REPORT);
++    if (len != RAZER_USB_REPORT_LEN)
++        return RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT;
++
++    err = razer_hyperflux_error(response);
++    if (err)
++        return err;
++
++    // As in razer_get_usb_response(): some callers use data_size as a length
++    if (response->data_size > ARRAY_SIZE(response->arguments)) {
++        response->data_size = ARRAY_SIZE(response->arguments);
++        return RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT;
++    }
++    return 0;
++}
+diff --git a/driver/razercommon.h b/driver/razercommon.h
+index 54651a9..0d47cf0 100644
+--- a/driver/razercommon.h
++++ b/driver/razercommon.h
+@@ -33,6 +33,16 @@ do { \
+ 
+ #define USB_VENDOR_ID_RAZER 0x1532
+ 
++/*
++ * HyperFlux Next virtual devices (see razercommon.c). razerkbd and
++ * razermouse report the capability so hyperflux-next-bridge can tell that
++ * the loaded driver takes these devices. The two errors reach userspace when
++ * the bridge got no response from the device.
++ */
++#define RAZER_HYPERFLUX_CAPABILITY "razer-feature-report-v1"
++#define RAZER_HYPERFLUX_NOT_SENT (-EAGAIN)
++#define RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT (-ENOTRECOVERABLE)
++
+ /* Each USB report has 90 bytes*/
+ #define RAZER_USB_REPORT_LEN 0x5A
+ 
+@@ -94,6 +104,7 @@ enum razer_matrix_effect_id {
+ #define RAZER_CMD_NOT_SUPPORTED 0x05
+ 
+ struct razer_report;
++struct hid_device;
+ 
+ struct razer_rgb {
+     unsigned char r,g,b;
+@@ -167,6 +178,8 @@ unsigned char razer_calculate_crc(struct razer_report *report);
+ struct razer_report get_razer_report(unsigned char command_class, unsigned char command_id, unsigned char data_size);
+ struct razer_report get_empty_razer_report(void);
+ void print_erroneous_report(struct razer_report* report, char* driver_name, char* message);
++bool razer_can_bind(struct hid_device *hdev);
++int razer_hyperflux_get_report(struct hid_device *hdev, struct razer_report *request, struct razer_report *response);
+ 
+ // Convenience functions
+ unsigned char clamp_u8(unsigned char value, unsigned char min, unsigned char max);
+diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
+index 5d9e2bd..5cad825 100644
+--- a/driver/razerkbd_driver.c
++++ b/driver/razerkbd_driver.c
+@@ -28,6 +28,12 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
+ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE(DRIVER_LICENSE);
++MODULE_INFO(hyperflux_native_transport, RAZER_HYPERFLUX_CAPABILITY);
++
++/* The same value for the loaded module, which the sandboxed bridge reads from sysfs. */
++static char *hyperflux_native_transport = RAZER_HYPERFLUX_CAPABILITY;
++module_param(hyperflux_native_transport, charp, 0444);
++MODULE_PARM_DESC(hyperflux_native_transport, "HyperFlux Next transport this driver supports");
+ 
+ // KEY_MACRO* has been added in Linux 5.5, so define ourselves for older kernels.
+ // See also https://git.kernel.org/torvalds/c/b5625db
+@@ -419,6 +425,8 @@ static int razer_get_report(struct usb_device *usb_dev, struct razer_report *req
+     return razer_get_usb_response(usb_dev, report_index, request, response_index, response, wait_min, wait_max);
+ }
+ 
++static int __razer_send_payload(struct razer_kbd_device *device, struct razer_report *request, struct razer_report *response);
++
+ /**
+  * Send report to the keyboard, but without even reading the response
+  */
+@@ -430,6 +438,13 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
+     /* Except the caller to have set the transaction_id */
+     WARN_ON(request->transaction_id.id == 0x00);
+ 
++    /* The bridge always answers, and expects the GET before the next SET. */
++    if (!device->usb_dev) {
++        struct razer_report response = {0};
++
++        return __razer_send_payload(device, request, &response);
++    }
++
+     razer_get_report_params(device->usb_dev, &report_index, &response_index, &wait_min, &wait_max);
+     return razer_send_control_msg(device->usb_dev, request, report_index, wait_min, wait_max);
+ }
+@@ -437,14 +452,17 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
+ /**
+  * Function to send to device, get response, and actually check the response
+  */
+-static int razer_send_payload(struct razer_kbd_device *device, struct razer_report *request, struct razer_report *response)
++static int __razer_send_payload(struct razer_kbd_device *device, struct razer_report *request, struct razer_report *response)
+ {
+     int err;
+ 
+     request->crc = razer_calculate_crc(request);
+ 
+     mutex_lock(&device->lock);
+-    err = razer_get_report(device->usb_dev, request, response);
++    if (device->usb_dev)
++        err = razer_get_report(device->usb_dev, request, response);
++    else
++        err = razer_hyperflux_get_report(device->hdev, request, response);
+     mutex_unlock(&device->lock);
+     if (err) {
+         print_erroneous_report(response, "razerkbd", "Invalid Report Length");
+@@ -456,7 +474,7 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
+         response->command_class != request->command_class ||
+         response->command_id.id != request->command_id.id) {
+         print_erroneous_report(response, "razerkbd", "Response doesn't match request");
+-        return -EIO;
++        return device->usb_dev ? -EIO : RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT;
+     }
+ 
+     switch (response->status) {
+@@ -478,6 +496,19 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
+     return 0;
+ }
+ 
++/*
++ * Most sysfs handlers ignore the result. For a HyperFlux device the first
++ * failure ends the handler with its error instead, so openrazer-daemon sees
++ * it and a write that takes several reports stops there.
++ */
++#define razer_send_payload(device, request, response) ({                     \
++    struct razer_kbd_device *__device = (device);                            \
++    int __err = __razer_send_payload(__device, (request), (response));       \
++    if (__err && !__device->usb_dev)                                         \
++        return __err;                                                        \
++    __err;                                                                   \
++})
++
+ /**
+  * Reads the physical layout of the keyboard.
+  *
+@@ -647,7 +678,7 @@ static void razer_set_device_mode(struct razer_kbd_device *device, unsigned char
+         return;
+     }
+ 
+-    razer_send_payload(device, &request, &response);
++    __razer_send_payload(device, &request, &response);
+ }
+ 
+ /**
+@@ -4970,15 +5001,27 @@ static int razer_kbd_input_mapping(struct hid_device *hdev, struct hid_input *hi
+ 
+ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *intf, struct hid_device *hdev)
+ {
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
+-
+     // Initialise mutex
+     mutex_init(&dev->lock);
+     // Setup values
+-    dev->usb_dev = usb_dev;
+-    dev->usb_vid = usb_dev->descriptor.idVendor;
+-    dev->usb_pid = usb_dev->descriptor.idProduct;
+-    dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
++    dev->hdev = hdev;
++    if (intf) {
++        struct usb_device *usb_dev = interface_to_usbdev(intf);
++
++        dev->usb_dev = usb_dev;
++        dev->usb_vid = usb_dev->descriptor.idVendor;
++        dev->usb_pid = usb_dev->descriptor.idProduct;
++        dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
++    } else {
++        /*
++         * A HyperFlux device has no USB device: usb_dev stays NULL, which
++         * the send functions check. It stands for the control interface,
++         * the one that gets the attributes.
++         */
++        dev->usb_vid = hdev->vendor;
++        dev->usb_pid = hdev->product;
++        dev->usb_interface_protocol = USB_INTERFACE_PROTOCOL_MOUSE;
++    }
+ }
+ 
+ /**
+@@ -4987,13 +5030,16 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
+ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ {
+     int retval = 0;
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
++    struct usb_interface *intf = hdev->bus == BUS_USB ? to_usb_interface(hdev->dev.parent) : NULL;
++    struct usb_device *usb_dev = intf ? interface_to_usbdev(intf) : NULL;
+     struct razer_kbd_device *dev = NULL;
+ 
++    if (!razer_can_bind(hdev))
++        return -ENODEV;
++
+     dev = kzalloc(sizeof(struct razer_kbd_device), GFP_KERNEL);
+     if(dev == NULL) {
+-        dev_err(&intf->dev, "out of memory\n");
++        hid_err(hdev, "out of memory\n");
+         return -ENOMEM;
+     }
+ 
+@@ -5001,7 +5047,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+     razer_kbd_init(dev, intf, hdev);
+ 
+     // Other interfaces are actual key-emitting devices
+-    if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_MOUSE) {
++    if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_MOUSE) {
+         // If the currently bound device is the control (mouse) interface
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
+@@ -5012,7 +5058,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
+ 
+-        switch(usb_dev->descriptor.idProduct) {
++        switch(dev->usb_pid) {
+ 
+         case USB_DEVICE_ID_RAZER_NOSTROMO:
+             CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
+@@ -5498,10 +5544,11 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+         // Set device to regular mode, not driver mode
+         // When the daemon discovers the device it will instruct it to enter driver mode
+         // Tartarus Pro resets when it receives this command
+-        if (usb_dev->descriptor.idProduct != USB_DEVICE_ID_RAZER_TARTARUS_PRO) {
++        // The bridge keeps the device mode of a HyperFlux device itself
++        if (usb_dev && usb_dev->descriptor.idProduct != USB_DEVICE_ID_RAZER_TARTARUS_PRO) {
+             razer_set_device_mode(dev, 0x00, 0x00);
+         }
+-    } else if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
++    } else if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_super);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_tab);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_f4);
+@@ -5521,7 +5568,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+     }
+ 
+     // Leave autosuspend on for laptops
+-    if (!is_blade_laptop(dev)) {
++    if (usb_dev && !is_blade_laptop(dev)) {
+         usb_disable_autosuspend(usb_dev);
+     }
+ 
+@@ -5540,13 +5587,11 @@ exit_free:
+ static void razer_kbd_disconnect(struct hid_device *hdev)
+ {
+     struct razer_kbd_device *dev;
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
+ 
+     dev = hid_get_drvdata(hdev);
+ 
+     // Other interfaces are actual key-emitting devices
+-    if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_MOUSE) {
++    if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_MOUSE) {
+         // If the currently bound device is the control (mouse) interface
+         device_remove_file(&hdev->dev, &dev_attr_version);
+         device_remove_file(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
+@@ -5557,7 +5602,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+         device_remove_file(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
+         device_remove_file(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
+ 
+-        switch(usb_dev->descriptor.idProduct) {
++        switch(dev->usb_pid) {
+ 
+         case USB_DEVICE_ID_RAZER_NOSTROMO:
+             device_remove_file(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
+@@ -6039,7 +6084,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+             device_remove_file(&hdev->dev, &dev_attr_macro_led_effect);              // Change macro LED effect (static, flashing)
+             break;
+         }
+-    } else if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
++    } else if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
+         device_remove_file(&hdev->dev, &dev_attr_key_super);
+         device_remove_file(&hdev->dev, &dev_attr_key_alt_tab);
+         device_remove_file(&hdev->dev, &dev_attr_key_alt_f4);
+@@ -6047,7 +6092,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+ 
+     hid_hw_stop(hdev);
+     kfree(dev);
+-    dev_info(&intf->dev, "Razer Device disconnected\n");
++    hid_info(hdev, "Razer Device disconnected\n");
+ }
+ 
+ /**
+@@ -6196,6 +6241,8 @@ static const struct hid_device_id razer_devices[] = {
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_HUNTSMAN_V3_PRO_8KHZ) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2024) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2025) },
++    // HyperFlux Next virtual devices, limited to the products above by razer_can_bind()
++    { HID_DEVICE(BUS_VIRTUAL,HID_GROUP_ANY,USB_VENDOR_ID_RAZER,HID_ANY_ID) },
+     { 0 }
+ };
+ 
+diff --git a/driver/razerkbd_driver.h b/driver/razerkbd_driver.h
+index 36a66ab..62d4fb0 100644
+--- a/driver/razerkbd_driver.h
++++ b/driver/razerkbd_driver.h
+@@ -174,6 +174,7 @@
+ #define RAZER_FIREFLY_WAIT_MAX_US 1000
+ 
+ struct razer_kbd_device {
++    struct hid_device *hdev;
+     struct usb_device *usb_dev;
+     struct mutex lock;
+     unsigned char usb_interface_protocol;
+diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
+index 36a58a3..bab2c10 100644
+--- a/driver/razermouse_driver.c
++++ b/driver/razermouse_driver.c
+@@ -32,6 +32,12 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
+ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE(DRIVER_LICENSE);
++MODULE_INFO(hyperflux_native_transport, RAZER_HYPERFLUX_CAPABILITY);
++
++/* The same value for the loaded module, which the sandboxed bridge reads from sysfs. */
++static char *hyperflux_native_transport = RAZER_HYPERFLUX_CAPABILITY;
++module_param(hyperflux_native_transport, charp, 0444);
++MODULE_PARM_DESC(hyperflux_native_transport, "HyperFlux Next transport this driver supports");
+ 
+ /**
+  * Send report to the mouse
+@@ -118,14 +124,17 @@ static int razer_get_report(struct usb_device *usb_dev, struct razer_report *req
+ /**
+  * Function to send to device, get response, and actually check the response
+  */
+-static int razer_send_payload(struct razer_mouse_device *device, struct razer_report *request, struct razer_report *response)
++static int __razer_send_payload(struct razer_mouse_device *device, struct razer_report *request, struct razer_report *response)
+ {
+     int err;
+ 
+     request->crc = razer_calculate_crc(request);
+ 
+     mutex_lock(&device->lock);
+-    err = razer_get_report(device->usb_dev, request, response);
++    if (device->usb_dev)
++        err = razer_get_report(device->usb_dev, request, response);
++    else
++        err = razer_hyperflux_get_report(device->hdev, request, response);
+     mutex_unlock(&device->lock);
+     if (err) {
+         print_erroneous_report(response, "razermouse", "Invalid Report Length");
+@@ -137,7 +146,7 @@ static int razer_send_payload(struct razer_mouse_device *device, struct razer_re
+         response->command_class != request->command_class ||
+         response->command_id.id != request->command_id.id) {
+         print_erroneous_report(response, "razermouse", "Response doesn't match request");
+-        return -EIO;
++        return device->usb_dev ? -EIO : RAZER_HYPERFLUX_MAY_HAVE_BEEN_SENT;
+     }
+ 
+     switch (response->status) {
+@@ -159,6 +168,19 @@ static int razer_send_payload(struct razer_mouse_device *device, struct razer_re
+     return 0;
+ }
+ 
++/*
++ * Most sysfs handlers ignore the result. For a HyperFlux device the first
++ * failure ends the handler with its error instead, so openrazer-daemon sees
++ * it and a write that takes several reports stops there.
++ */
++#define razer_send_payload(device, request, response) ({                     \
++    struct razer_mouse_device *__device = (device);                          \
++    int __err = __razer_send_payload(__device, (request), (response));       \
++    if (__err && !__device->usb_dev)                                         \
++        return __err;                                                        \
++    __err;                                                                   \
++})
++
+ /*
+  * Specific functions for ancient devices
+  *
+@@ -6010,17 +6032,30 @@ static int razer_input_configured(struct hid_device *hdev,
+  */
+ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interface *intf, struct hid_device *hdev)
+ {
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
+     unsigned int rand_serial = 0;
+ 
+     // Initialise mutex
+     mutex_init(&dev->lock);
+     // Setup values
+-    dev->usb_dev = usb_dev;
+-    dev->usb_vid = usb_dev->descriptor.idVendor;
+-    dev->usb_pid = usb_dev->descriptor.idProduct;
+-    dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
+-    dev->usb_interface_subclass = intf->cur_altsetting->desc.bInterfaceSubClass;
++    dev->hdev = hdev;
++    if (intf) {
++        struct usb_device *usb_dev = interface_to_usbdev(intf);
++
++        dev->usb_dev = usb_dev;
++        dev->usb_vid = usb_dev->descriptor.idVendor;
++        dev->usb_pid = usb_dev->descriptor.idProduct;
++        dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
++        dev->usb_interface_subclass = intf->cur_altsetting->desc.bInterfaceSubClass;
++    } else {
++        /*
++         * A HyperFlux device has no USB device: usb_dev stays NULL, which
++         * the send functions check. It stands for the control interface,
++         * the one that gets the attributes.
++         */
++        dev->usb_vid = hdev->vendor;
++        dev->usb_pid = hdev->product;
++        dev->usb_interface_protocol = USB_INTERFACE_PROTOCOL_MOUSE;
++    }
+ 
+     // Get a "random" integer
+     get_random_bytes(&rand_serial, sizeof(unsigned int));
+@@ -6054,14 +6089,17 @@ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interfac
+ static int razer_mouse_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ {
+     int retval = 0;
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
++    struct usb_interface *intf = hdev->bus == BUS_USB ? to_usb_interface(hdev->dev.parent) : NULL;
+     struct razer_mouse_device *dev = NULL;
+     unsigned char expected_subclass = 0xFF;
+ 
++    if (!razer_can_bind(hdev))
++        return -ENODEV;
++
+     dev = kzalloc(sizeof(struct razer_mouse_device), GFP_KERNEL);
+ 
+     if(dev == NULL) {
+-        dev_err(&intf->dev, "out of memory\n");
++        hid_err(hdev, "out of memory\n");
+         return -ENOMEM;
+     }
+ 
+@@ -7185,12 +7223,10 @@ exit_free:
+ static void razer_mouse_disconnect(struct hid_device *hdev)
+ {
+     struct razer_mouse_device *dev;
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
+ 
+     dev = hid_get_drvdata(hdev);
+ 
+-    if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_MOUSE) {
++    if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_MOUSE) {
+         device_remove_file(&hdev->dev, &dev_attr_version);
+         device_remove_file(&hdev->dev, &dev_attr_test);
+         device_remove_file(&hdev->dev, &dev_attr_firmware_version);
+@@ -7198,7 +7234,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
+         device_remove_file(&hdev->dev, &dev_attr_device_serial);
+         device_remove_file(&hdev->dev, &dev_attr_device_mode);
+ 
+-        switch(usb_dev->descriptor.idProduct) {
++        switch(dev->usb_pid) {
+         case USB_DEVICE_ID_RAZER_ABYSSUS_ELITE_DVA_EDITION:
+         case USB_DEVICE_ID_RAZER_ABYSSUS_ESSENTIAL:
+             device_remove_file(&hdev->dev, &dev_attr_poll_rate);
+@@ -8270,7 +8306,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
+     hrtimer_cancel(&dev->repeat_timer);
+ 
+     kfree(dev);
+-    dev_info(&intf->dev, "Razer Device disconnected\n");
++    hid_info(hdev, "Razer Device disconnected\n");
+ }
+ 
+ /**
+@@ -8390,6 +8426,8 @@ static const struct hid_device_id razer_devices[] = {
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_VERTICAL_EDITION_WIRED) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_WIRED) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_WIRELESS) },
++    // HyperFlux Next virtual devices, limited to the products above by razer_can_bind()
++    { HID_DEVICE(BUS_VIRTUAL,HID_GROUP_ANY,USB_VENDOR_ID_RAZER,HID_ANY_ID) },
+     { 0 }
+ };
+ 
+diff --git a/driver/razermouse_driver.h b/driver/razermouse_driver.h
+index 66612ff..22ad571 100644
+--- a/driver/razermouse_driver.h
++++ b/driver/razermouse_driver.h
+@@ -142,6 +142,7 @@
+ #define RAZER_MOUSE_MAX_DPI_STAGES 5
+ 
+ struct razer_mouse_device {
++    struct hid_device *hdev;
+     struct usb_device *usb_dev;
+     struct mutex lock;
+ 
+diff --git a/install_files/udev/99-razer.rules b/install_files/udev/99-razer.rules
+index ca66a20..de4749f 100644
+--- a/install_files/udev/99-razer.rules
++++ b/install_files/udev/99-razer.rules
+@@ -1,3 +1,7 @@
++# HyperFlux Next virtual devices have no USB parent, so the rules below never
++# match them. Give their attributes to the OpenRazer group once the driver binds.
++ACTION=="bind", SUBSYSTEM=="hid", KERNEL=="0006:1532:*", ENV{HID_PHYS}=="hyperflux-next/native/v1/*", DRIVER=="razerkbd", RUN+="razer_mount razerkbd $kernel"
++ACTION=="bind", SUBSYSTEM=="hid", KERNEL=="0006:1532:*", ENV{HID_PHYS}=="hyperflux-next/native/v1/*", DRIVER=="razermouse", RUN+="razer_mount razermouse $kernel"
+ ACTION!="add", GOTO="razer_end"
+ SUBSYSTEMS=="usb|input|hid", ATTRS{idVendor}=="1532", GOTO="razer_vendor"
+ GOTO="razer_end"

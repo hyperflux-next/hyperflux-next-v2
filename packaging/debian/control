@@ -1,0 +1,93 @@
+Source: hyperflux-next-v2
+Section: misc
+Priority: optional
+Maintainer: offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13),
+               ca-certificates,
+               cargo (>= 1.95),
+               cmake,
+               curl,
+               g++,
+               patch,
+               pkgconf,
+               python3,
+               qt6-base-dev,
+               qtbase5-dev,
+               rustc (>= 1.95)
+Standards-Version: 4.7.2
+Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
+Rules-Requires-Root: no
+
+Package: hyperflux-next-v2-linux
+Architecture: amd64
+Depends: systemd,
+         udev,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Provides: hyperflux-next-dkms (= ${binary:Version}),
+          hyperflux-next-linux (= ${binary:Version})
+Conflicts: hyperflux-next-dkms, hyperflux-next-linux, hyperflux-v2-linux-dkms
+Replaces: hyperflux-next-dkms, hyperflux-next-linux, hyperflux-v2-linux-dkms
+Description: HyperFlux Next V2 bridge, CLI and base services
+ The HyperFlux Next V2 bridge and device keeper services, the hyperfluxctl
+ command, and the system users, sockets and udev rules they need. The
+ bridge reaches the Razer HyperFlux V2 receiver (USB 1532:00cf) through
+ hidraw, and the batteries of the devices paired to it show up in the
+ desktop's battery widget. It takes over from the hyperflux-next-linux
+ package and the receiver kernel modules of earlier releases.
+ .
+ This is the Core edition. Install hyperflux-next-v2-full to use the
+ devices in OpenRazer apps, and hyperflux-next-v2-openrgb-plugin for
+ OpenRGB.
+
+Package: hyperflux-next-v2-openrazer-driver-dkms
+Architecture: all
+Depends: dkms,
+         systemd,
+         udev,
+         ${misc:Depends}
+Provides: hyperflux-next-openrazer-driver-dkms (= ${binary:Version}),
+          hyperflux-openrazer-driver-abi (= 3.12.4),
+          openrazer-driver-dkms (= 3.12.4+dfsg-1),
+          openrazer-kernel-modules-dkms
+Conflicts: hyperflux-next-openrazer-driver-dkms, openrazer-driver-dkms, openrazer-kernel-modules-dkms
+Replaces: hyperflux-next-openrazer-driver-dkms, openrazer-driver-dkms, openrazer-kernel-modules-dkms
+Description: OpenRazer driver sources with the HyperFlux Next V2 transport, for DKMS
+ OpenRazer 3.12.4's kernel drivers with the patches that let them drive
+ the devices HyperFlux Next V2 offers. It takes the place of the
+ distribution's openrazer-driver-dkms, so the stock openrazer-daemon
+ installs on top of it.
+
+Package: hyperflux-next-v2-full
+Architecture: all
+Depends: hyperflux-next-v2-linux (= ${source:Version}),
+         hyperflux-next-v2-openrazer-driver-dkms (= ${source:Version}),
+         ${hfx:Full-Depends},
+         ${misc:Depends}
+Recommends: ${hfx:Full-Recommends}
+Provides: hyperflux-next-full (= ${binary:Version})
+Conflicts: hyperflux-next-full
+Replaces: hyperflux-next-full
+Suggests: openrazer-daemon, python3-openrazer
+Description: HyperFlux Next V2 Core plus OpenRazer support for the paired devices
+ The udev rules and module list that let the HyperFlux Next V2 bridge offer
+ the paired devices to OpenRazer apps such as Polychromatic. On Debian it
+ also brings the OpenRGB plugin, which Debian's own OpenRGB loads.
+
+Package: hyperflux-next-v2-openrgb-plugin
+Architecture: amd64
+Depends: hyperflux-next-v2-linux (= ${binary:Version}),
+         ${hfx:OpenRGB},
+         ${misc:Depends},
+         ${shlibs:Depends}
+Enhances: openrgb
+# The old hyperflux-next-full carried a plugin. This lets apt unpack the
+# new one before it has removed the old package.
+Replaces: hyperflux-next-full (<< 1:1.0.1~)
+Description: HyperFlux Next V2 plugin for OpenRGB
+ Shows the Razer devices paired with a HyperFlux V2 receiver in OpenRGB,
+ and adds a page with their batteries to OpenRGB's Information tab.
+ .
+ The Debian package is built for Debian's own OpenRGB 1.0. The Ubuntu
+ package is built for OpenRGB 1.1 from openrgb.org and depends on it,
+ because Ubuntu's own OpenRGB is too old to load the plugin.

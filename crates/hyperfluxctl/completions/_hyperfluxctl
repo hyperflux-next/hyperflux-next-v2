@@ -1,0 +1,55 @@
+#compdef hyperfluxctl
+# SPDX-License-Identifier: GPL-2.0-only
+
+local -a commands common
+commands=(
+  'status:driver, bridge and device summary'
+  'devices:details of every paired device'
+  'battery:battery levels'
+  'watch:print device changes as they happen'
+  'doctor:find problems and say what to do'
+  'bench:measure report latency of every online device (read-only)'
+  'capture:record receiver reports to a file'
+  'stall-check:look for cursor stalls while the mouse moves'
+  'report:make a full device report file'
+  'support-bundle:write a file for a bug report'
+  'probe:ask the receiver about its paired devices (diagnostic)'
+  'help:show usage'
+)
+common=('--json[print JSON]' '--socket[bridge socket]:socket:_files')
+
+local curcontext=$curcontext state line
+_arguments -C $common '--help[show usage]' '--version[show the version]' \
+  '1:command:->command' '*::option:->option'
+
+case $state in
+  command)
+    _describe -t commands 'hyperfluxctl command' commands
+    ;;
+  option)
+    case $words[1] in
+      battery) _arguments $common '--waybar[print JSON for waybar]' ;;
+      doctor)
+        _arguments $common '--explain[explain every finding]' \
+          '--fix[offer the safe fixes]' '--yes[run user-level fixes without asking]'
+        ;;
+      bench)
+        _arguments $common '--device[measure only this device]:device id:' \
+          '*--delay-us[first GET delay]:microseconds:' \
+          '*--retry-us[wait between GETs]:microseconds:' \
+          '--iterations[runs per delay]:count:' '--query[query to send]:query:(firmware battery)' \
+          '--reread-busy[read again after a busy answer]' '--quick[only the most useful waits]' \
+          '--defaults[only the timings the bridge uses]'
+        ;;
+      capture) _arguments $common '--seconds[how long to record]:seconds:' '--output[file]:file:_files' ;;
+      stall-check)
+        _arguments $common '--seconds[how long to listen]:seconds:' \
+          '--threshold-ms[shortest gap that counts]:milliseconds:' '--ab[send queries in the second half]'
+        ;;
+      report) _arguments $common '--seconds[how long to capture]:seconds:' '--output[file]:file:_files' ;;
+      support-bundle) _arguments $common '--preview[show what would be written]' '--output[file]:file:_files' ;;
+      probe) _arguments $common '1:what:(receiver)' ;;
+      *) _arguments $common ;;
+    esac
+    ;;
+esac

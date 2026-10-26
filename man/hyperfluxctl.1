@@ -1,0 +1,366 @@
+.\" SPDX-License-Identifier: GPL-2.0-only
+.TH HYPERFLUXCTL 1 2026-10-23 "HyperFlux Next V2 1.0.0" "User Commands"
+.SH NAME
+hyperfluxctl \- inspect and troubleshoot Razer devices on a HyperFlux V2 receiver
+.SH SYNOPSIS
+.B hyperfluxctl
+.RB [ \-\-json ]
+.RB [ \-\-socket
+.IR path ]
+.I command
+.RI [ options ]
+.SH DESCRIPTION
+.B hyperfluxctl
+talks to
+.B hyperflux\-next\-bridge
+and looks at how the receiver's hidraw nodes, /dev/uhid, the device keeper
+and the OpenRazer drivers are set up.
+It changes nothing unless
+.B doctor \-\-fix
+asks first and gets a yes.
+.PP
+It connects to the per-user socket
+.I /run/user/UID/hyperflux\-next\-bridge.sock
+first and falls back to the system socket, which works for members of the
+.B hyperflux
+group.
+Each run uses its own client id, so several can run at once.
+.SH COMMANDS
+.TP
+.B status
+Driver, bridge, device keeper, number of receivers, one line per device,
+and the next thing to do.
+The driver line says how the bridge reaches the receiver:
+.BR active ,
+.BR "no receiver" ,
+.BI "owned by " driver
+(another driver holds an interface the bridge needs),
+.BR "no hidraw node" ,
+or
+.B hidraw not open to the bridge and keeper
+(the node's owner, group or mode is wrong).
+The keeper line says whether
+.B hyperflux\-next\-keeper.service
+runs and the bridge has it, as systemd reports it.
+When Doctor only has warnings, the next thing is
+.BR "no action required" ,
+with the number of warnings.
+.TP
+.B devices
+One block per device.
+It has the ids, the receiver and what named its devices (its paired slots
+or its pairing inventory), lane, support, presence, last contact, battery
+and its age, and which program controls the device.
+It also says whether the device's slot reports it connected through the
+receiver, and what became of its OpenRazer device
+.RI ( live ,
+.IR "on its cable" ,
+or why not).
+Then comes how long the bridge waits after sending to the device before
+the first read, learned from the catalog's value, for example
+.IR "wait 3.0 ms (learned from 3.0)" ,
+with
+.I resumed at 5.0
+added when learning went on from a wait kept from the bridge's last run.
+Last are the device's exchange counts since the bridge started: how many,
+how many were answered at the first read or not at all, and how often the
+bridge read again after another reply or a busy one.
+A device the receiver hasn't named yet is listed as an
+.I Unidentified pointer device
+or
+.IR "Unidentified keyboard device" ,
+with its battery only, until moving or waking it makes the receiver name it.
+With
+.BR \-\-json ,
+each device also lists, with counts, the commands the bridge refused
+because they are missing from the device's list.
+.TP
+.BR battery " [" \-\-waybar ]
+One battery line per device.
+When the bridge has no way to learn whether a device is charging, its
+line says
+.IR "charging not reported" ,
+and a device that answered that it can't report its level says
+.IR "not reported" .
+With
+.BR \-\-waybar ,
+one JSON object with
+.BR text ,
+.BR tooltip ,
+.B class
+and
+.B percentage
+for a bar's custom module.
+It is printed even when the bridge can't be reached.
+The class is never
+.B low
+or
+.B critical
+while the level is rising.
+.TP
+.B watch
+Prints a device line whenever that device changes.
+Runs until interrupted and reconnects when the bridge restarts.
+.TP
+.BR doctor " [" \-\-explain "] [" \-\-fix " [" \-\-yes ]]
+Checks what is left of the 2.x driver, the receiver's hidraw nodes,
+/dev/uhid, the bridge and its device keeper, and each device's battery
+entry.
+When the OpenRazer integration is installed, it checks that as well.
+Then it explains the first problem it finds.
+Warnings, such as a uaccess ACL on /dev/uhid, count as findings too.
+When there is nothing but warnings, it says HyperFlux Next V2 is ready,
+gives the number of warnings and explains the first one.
+.B \-\-explain
+explains every finding.
+.B \-\-fix
+shows the safe fixes as exact commands and asks before running each one.
+Without a terminal it just lists them.
+Fixes that need root run through a visible
+.B sudo
+and are always asked about.
+.B \-\-yes
+skips the question only for fixes that run as yourself.
+.TP
+\fBbench\fR [\fB\-\-device\fR \fIid\fR] [\fB\-\-delay\-us\fR \fIn\fR]... [\fB\-\-retry\-us\fR \fIn\fR]... [\fB\-\-iterations\fR \fIn\fR] [\fB\-\-query firmware\fR|\fBbattery\fR] [\fB\-\-reread\-busy\fR [\fB\-\-quick\fR]] [\fB\-\-defaults\fR]
+Measures how long a read-only query takes with shorter waits before the
+first read (default 8000 6000 5000 4000 3000 microseconds, 20 runs each).
+It measures every online device, or just the one
+.B \-\-device
+names.
+.B \-\-iterations
+sets the number of runs, from 1 to 1000.
+Each device's table is headed with the wait the bridge uses for it
+outside bench.
+Answers other than a success are counted by the receiver's status:
+.BR busy ,
+.BR failed ,
+.B no response/asleep
+and
+.BR "not supported" .
+.I without an answer
+means nothing that matched came back.
+Nothing on the devices or in the bridge's settings is changed.
+.B \-\-retry\-us
+(1000 to 10000, repeatable) also tries other waits between reads after
+a read that found no answer, instead of the 1 ms the bridge uses outside
+bench.
+The table then has a row for each first wait and retry interval, with the
+median, p90 and maximum time and the reads per exchange.
+Whatever the interval, the reads end 40 ms after the first.
+A shorter interval just fits more of them in.
+.B \-\-reread\-busy
+reads again after a busy answer, as the bridge does outside bench, at the
+retry interval and within the same time. Without it bench takes busy as
+the answer, which shows how often a device answers busy at each wait.
+Its defaults are first waits of 1000 2000 3000 4000 6000 and retry
+intervals of 1000 2000 5000 10000 microseconds, and the table gets a
+.B busy
+column for the exchanges still busy at the end.
+.B \-\-quick
+cuts that to first waits of 2000 3000 4000 and retry intervals of 1000
+and 2000.
+.B \-\-defaults
+measures each device at the timings the bridge uses for it now: its
+learned first wait and 1 ms between reads, reading on after busy answers.
+It prints one row per device with the successful runs, the median, p90 and
+maximum time and the reads per exchange.
+It doesn't combine with
+.BR \-\-delay\-us ,
+.BR \-\-retry\-us ,
+.B \-\-reread\-busy
+or
+.BR \-\-quick .
+.TP
+\fBcapture\fR [\fB\-\-seconds\fR \fIn\fR] [\fB\-\-output\fR \fIpath\fR]
+Records receiver reports for
+.I n
+seconds (default 60) into a JSON lines file readable only by you, to help
+add support for a new device.
+It starts with the receiver's pairing inventory.
+Of that it keeps the first 64 bytes, the length, the offset where the
+bridge found the marker and the product ids, and nothing that could tell
+one receiver from another.
+Vendor reports are recorded as they came, up to 16 bytes each.
+Key presses and pointer movement are recorded as activity, without their
+contents.
+Receiver ids become
+.BR receiver\-1 ,
+.B receiver\-2
+and so on, as in
+.BR report .
+An existing file is never overwritten.
+.TP
+\fBstall\-check\fR [\fB\-\-seconds\fR \fIn\fR] [\fB\-\-threshold\-ms\fR \fIn\fR] [\fB\-\-ab\fR]
+Listens to the receiver's pointer input for
+.I n
+seconds (default 60) while you move the mouse in circles.
+It reports the report rate, the time between reports (p50, p99, maximum)
+and every stall: a gap longer than the threshold (default 50 ms) in the
+middle of movement.
+It finds the input devices in sysfs (those of USB 1532:00cf with REL_X and
+REL_Y), opens them read-only and never grabs them, so the desktop gets
+every event.
+Its own copy of the events is stamped with CLOCK_BOOTTIME, the bridge's
+clock.
+Reading them needs the
+.B input
+group or root.
+Without either it says so and exits 3.
+.IP
+The rules: a gap is a stall when at least 5 motion reports come in the
+100 ms before it and 5 in the 100 ms after it (the first report after the
+gap left out), and one side's distance is at most 3 times the other's.
+Gaps over 1 s are pauses.
+Gaps where the kernel dropped events are left out.
+.IP
+Each stall is listed with what overlapped it.
+Replies in the bridge's capture stream count if they ended between the
+start of the gap and 60 ms after its end, since an exchange takes at most
+that long.
+Each one shows its lane and class/command, and whether the bridge, an app
+or this check asked.
+The kernel's USB, HID and suspend lines (from
+.BR "journalctl \-k" )
+within 250 ms of it are listed too.
+The bridge records replies to queries only, so writes such as lighting
+changes can't be matched.
+It also says how much of the run had an exchange under way, which gives
+the number of overlaps chance alone would produce.
+The verdict says the queries can delay movement when at least two stalls
+overlap traffic and at least twice as many as chance would give.
+That is correlation, not proof.
+.IP
+With
+.BR \-\-ab ,
+the first half just listens.
+In the second, this check sends a read-only battery query to the mouse
+every 500 ms through bench (a device mode query, then 07/80).
+Each query takes a lease of its own and uses the wait the bridge has
+learned for the mouse.
+The halves are compared by stalls per minute of movement.
+They count as different when a one-sided binomial test of how the stalls
+split between them, weighted by each half's movement, is below 5%.
+Less than 5 s of movement, in the run or in either half, is too little to
+tell.
+.TP
+.B probe receiver
+For maintainers.
+Has the bridge ask each receiver its fixed read-only questions about the
+paired devices (00:bf on transaction ids 0x08, 0x88 and 0x3f, and 00:c5 on
+0x1f, which other Razer receivers answer).
+It prints each raw answer with its status, data size and first 16 data
+bytes, or
+.IR "no answer" ,
+and the first 22 bytes of the pairing inventory.
+The bridge asks 00:bf on 0x08 and 0x3f itself, to name the devices.
+.TP
+\fBreport\fR [\fB\-\-seconds\fR \fIn\fR] [\fB\-\-output\fR \fIpath\fR]
+Makes one complete device report in a single JSON file, to send with a
+request to support an untested device.
+The file is readable only by you and never overwrites an existing one.
+It holds
+.B devices
+in JSON, a guided capture that prompts you through using the device for
+.I n
+seconds (default 180: idle, then use it, a mouse on and off its mat, the
+cable in and out, and sleep and wake),
+.BR "bench \-\-defaults \-\-iterations 200" ,
+.BR doctor ,
+.B "probe receiver"
+and the bridge's and the keeper's journal lines for this boot about the
+OpenRazer side, refused commands, serial reads, the cable twin and the
+keeper's connection.
+It masks receiver ids and input link names, and Doctor's suggested commands
+in it say
+.B $USER
+and
+.BR "$(id \-u)" ,
+as in
+.BR support\-bundle .
+When the journal can't be read it says so rather than leaving it out.
+.TP
+\fBsupport\-bundle\fR [\fB\-\-preview\fR] [\fB\-\-output\fR \fIpath\fR]
+Writes one JSON file for a bug report, readable only by you and never
+overwriting an existing file.
+It holds versions, driver and bridge state, Doctor's findings and device
+models, but no serial numbers, receiver ids, input link names, reports or
+logs.
+Doctor's suggested commands in it say
+.B $USER
+and
+.B $(id \-u)
+where they need your login name or user id.
+.B \-\-preview
+shows what would be written and writes nothing.
+.SH OPTIONS
+.TP
+.B \-\-json
+Print one JSON document instead of text.
+.B watch
+prints one object per line.
+.TP
+.BI \-\-socket " path"
+Talk to the bridge on
+.I path
+only.
+.TP
+.BR \-\-help ", " \-\-version
+Print the usage or the version.
+.SH EXIT STATUS
+.TP
+.B 0
+Fine.
+.TP
+.B 1
+Usage error, or the command failed.
+.TP
+.B 2
+Doctor found something: a problem, or only warnings.
+.B status
+exits 0 even when Doctor would find something.
+.B stall\-check
+exits 2 when it found stalls, and 1 when there was too little movement.
+.TP
+.B 3
+.B stall\-check
+can't read the receiver's input devices.
+.SH ENVIRONMENT
+.TP
+.B HYPERFLUX_NEXT_SOCKET
+Use this socket instead of the per-user and system sockets.
+.SH FILES
+.TP
+.I /run/hyperflux\-next/bridge.sock
+The bridge's system socket.
+.TP
+.I /run/hyperflux\-next/keeper.sock
+Where the device keeper reaches the bridge.
+Only the keeper's user may connect.
+.SH EXAMPLES
+A waybar module that shows battery levels:
+.PP
+.in +4n
+.EX
+"custom/hyperflux": {
+    "exec": "hyperfluxctl battery \-\-waybar",
+    "return\-type": "json",
+    "interval": 60,
+    "format": "{}"
+}
+.EE
+.in
+.PP
+The same for polybar, which takes plain text:
+.PP
+.in +4n
+.EX
+[module/hyperflux]
+type = custom/script
+exec = hyperfluxctl battery \-\-waybar | jq \-r .text
+interval = 60
+.EE
+.in
+.SH SEE ALSO
+.BR systemctl (1),
+.BR upower (1)

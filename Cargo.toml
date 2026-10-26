@@ -1,0 +1,60 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/hfx-proto",
+    "crates/hfx-bridge",
+    "crates/hyperfluxctl",
+]
+
+# The product version. scripts/set-version changes it here and in the other
+# version locations listed in ARCHITECTURE.md; a test checks they agree.
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "GPL-2.0-only"
+publish = false
+
+# Every third-party crate a member may use. Members write `name.workspace = true`.
+# Adding a crate means adding it here, with a reason, in the same change.
+[workspace.dependencies]
+hfx-proto = { path = "crates/hfx-proto" }
+
+# Protocol encoding. raw_value lets the decoder reject unknown and duplicate
+# fields at every level without building a serde_json::Value tree first.
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.154", features = ["raw_value"] }
+
+# Safe syscalls: epoll, netlink, clock_gettime(CLOCK_BOOTTIME), SO_PEERCRED,
+# uid/pid, flock, stat.
+rustix = { version = "=1.1.3", features = ["event", "fs", "net", "process", "time", "std"] }
+
+# ioctl(2) on the receiver's hidraw nodes. Only hfx-bridge uses it.
+libc = "=0.2.191"
+
+# Route tokens, receiver ids, UHID phys labels, serial fingerprints.
+sha2 = "=0.11.1"
+getrandom = "=0.4.3"
+
+# SIGTERM/SIGINT/SIGQUIT in the daemon and in long-running CLI commands.
+signal-hook = "=0.4.5"
+
+# Tests only.
+tempfile = "=3.25.0"
+proptest = { version = "=1.12.0", default-features = false, features = ["std"] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+
+# Small binaries: the daemon and CLI are I/O bound, so size beats speed here.
+[profile.release]
+opt-level = "s"
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+strip = "symbols"

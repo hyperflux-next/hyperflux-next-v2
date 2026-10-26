@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ]; then
+    systemd-sysusers hyperflux-next.conf
+    if [ -d /run/systemd/system ]; then
+        udevadm control --reload || true
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

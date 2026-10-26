@@ -1,0 +1,67 @@
+[Unit]
+Description=HyperFlux Next V2 bridge
+Documentation=man:hyperfluxctl(1)
+After=systemd-udevd.service
+# Stopping after user sessions means openrazer-daemon is gone before the
+# virtual devices disappear; the other order hung shutdown for 90 seconds.
+Before=systemd-user-sessions.service
+# The device keeper holds the receiver's input and the virtual devices.
+Wants=hyperflux-next-keeper.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=30s
+User=hyperflux-next
+Group=hyperflux
+SupplementaryGroups=hyperflux-next
+ExecStart=/usr/lib/hyperflux-next/hyperflux-next-bridge
+RuntimeDirectory=hyperflux-next
+RuntimeDirectoryMode=2750
+# The learned first-GET waits, kept across restarts.
+StateDirectory=hyperflux-next
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=2s
+TimeoutStartSec=15s
+TimeoutStopSec=10s
+LimitNOFILE=256
+TasksMax=64
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+# The receiver's hidraw nodes; the keeper has /dev/uhid.
+DevicePolicy=closed
+DeviceAllow=char-hidraw rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# Clients name themselves in hello, so the bridge reads no other process's
+# /proc entries, and nothing of /proc but its own.
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectClock=yes
+# AF_NETLINK for uevents: receivers coming and going, OpenRazer drivers
+# registering, wired twins. No IP at all.
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+IPAddressDeny=any
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@mount @privileged @resources
+RemoveIPC=yes
+ReadWritePaths=/run/hyperflux-next
+
+[Install]
+WantedBy=multi-user.target

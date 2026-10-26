@@ -1,0 +1,2 @@
+# The group that owns OpenRazer's device files. openrazer-daemon users join it.
+g @OPENRAZER_GROUP@ -

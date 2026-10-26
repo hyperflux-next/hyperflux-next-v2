@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+  # Cargo.toml pins exact versions on purpose; a bump arrives as one PR
+  # that changes the pin and Cargo.lock together.
+  - package-ecosystem: cargo
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      crates:
+        patterns: ["*"]
+  # The build images are pinned by digest in these files, all but
+  # openSUSE Tumbleweed's (see its Containerfile).
+  - package-ecosystem: docker
+    directory: /packaging/containers
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      images:
+        patterns: ["*"]

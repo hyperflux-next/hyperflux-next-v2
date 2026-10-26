@@ -1,0 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+
+/* Only Qt's plugin entry points leave the library. Everything else,
+   including the standard library templates inside, stays local, so the
+   plugin's copies never stand in for the host's. */
+{
+    global:
+        qt_plugin_instance;
+        qt_plugin_query_metadata*;
+    local:
+        *;
+};

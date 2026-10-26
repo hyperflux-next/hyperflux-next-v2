@@ -1,0 +1,102 @@
+name: Weekly
+
+# Early warnings about the world moving: new kernels, new distribution
+# images and new OpenRazer releases in the distributions. Nothing here
+# gates a pull request.
+
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CONTAINER_ENGINE: docker
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  kernel-canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container: docker.io/library/archlinux:base-devel
+    env:
+      KBUILD_MODPOST_WARN: 1
+    steps:
+      - name: Install Arch's kernel headers and the testing kernel's
+        run: |
+          pacman -Syu --noconfirm --needed bc cpio git libelf linux-headers linux-lts-headers pahole python python-pytest
+          # core-testing has the kernel Arch ships next; only its headers are unpacked.
+          printf '%s\n' '[options]' 'Architecture = auto' 'SigLevel = Required DatabaseOptional' \
+            '[core-testing]' 'Include = /etc/pacman.d/mirrorlist' >/tmp/testing.conf
+          mkdir -p /tmp/testing/db /tmp/testing/cache /opt/testing
+          testing() { pacman --config /tmp/testing.conf --dbpath /tmp/testing/db --cachedir /tmp/testing/cache "$@"; }
+          testing -Sy
+          if testing -Sddw --noconfirm core-testing/linux-headers; then
+            bsdtar -xf /tmp/testing/cache/linux-headers-*.pkg.tar.zst -C /opt/testing
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare the newest mainline kernel
+        run: scripts/kernel-tree.sh mainline /opt/mainline
+      - name: Build the patched OpenRazer drivers against every kernel
+        run: |
+          status=0
+          for kdir in /usr/lib/modules/*/build /opt/testing/usr/lib/modules/*/build /opt/mainline; do
+            [ -f "$kdir/Makefile" ] || continue
+            echo "::group::$kdir"
+            if make openrazer-test KDIR="$kdir"; then
+              echo "$kdir: ok" >>"$GITHUB_STEP_SUMMARY"
+            else
+              echo "$kdir: FAILED" >>"$GITHUB_STEP_SUMMARY"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+  soak:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+      # Thirty minutes of random events against the simulator, checking for
+      # leaks, bounded memory and a bridge that goes quiet afterwards.
+      - name: Simulated soak
+        env:
+          HFX_SOAK_SECS: 1800
+        run: cargo test -p hfx-bridge --locked --test soak -- --ignored --nocapture
+
+  distributions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [arch, ubuntu, debian, fedora, opensuse]
+    env:
+      HFX_LATEST_IMAGES: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The install test also fails when the distribution's openrazer-daemon
+      # moved past the OpenRazer version our driver package provides.
+      - name: Packages on today's ${{ matrix.target }} image
+        run: scripts/package.sh "${{ matrix.target }}" --install-test

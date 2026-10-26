@@ -1,0 +1,4 @@
+# The device keeper publishes each device's battery through /dev/uhid.
+# Loading uhid at boot gives the node its permissions before the keeper
+# starts.
+uhid

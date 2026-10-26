@@ -1,0 +1,738 @@
+# What HyperFlux Next V2 knows about the receiver and the devices that pair
+# with it.
+#
+# This is the readable catalog. Code keeps its own copies:
+#   crates/hfx-proto/src/devices.rs        everything below but the sources
+#   integrations/openrgb/src/device_table.hpp   devices with an [openrgb] part
+#   integrations/openrazer/70-hyperflux-next-openrazer-keys.rules   key links
+#   integrations/openrazer/hyperflux-next-openrazer.modules-load.conf
+# tests/test_device_tables.py checks that every copy says the same thing,
+# so change this file and the copies together. tests/test_upstream_tables.py
+# and integrations/openrgb/tests/check-device-table.py hold the entries to
+# the pinned OpenRazer and OpenRGB sources.
+#
+# Device fields:
+#   product_id        id the device has through the receiver (its wireless id)
+#   wired_product_id  id on a USB cable
+#   name              OpenRazer's name for the wireless device without
+#                     "(Wireless)"; OpenRGB's name when OpenRazer lacks it
+#   tier              tested   used through the receiver on real hardware
+#                     checked  Razer lists it for the HyperFlux V2, OpenRazer
+#                              3.12.4 or OpenRGB 1.1 drives it, and the entry
+#                              matches theirs; not yet tested through the
+#                              receiver
+#                     listed   Razer lists it, but neither release drives it
+#   charge            how passive status bytes become a charging state:
+#                     mouse-status or keyboard-status, both learned on
+#                     hardware, or none. A tested or checked device with
+#                     none is asked 07/84 whatever its commands say, and its
+#                     answer read as OpenRazer reads it.
+#   first_get_delay_us  how long the bridge first waits after sending a
+#                     request before its first read, then learns the
+#                     device's own; below 6000 only with hyperfluxctl bench
+#                     results from the device itself
+#   commands          "class:id:sizes" the device accepts through a route,
+#                     the union of what OpenRazer 3.12.4 and OpenRGB 1.1
+#                     send. The two that only OpenRGB drives also keep
+#                     00:84:2, which bench sends first to every device.
+#   [device.openrazer]  present when OpenRazer 3.12.4 supports the device;
+#                       event_file_regex is left out when the daemon class
+#                       has none; key_event_link is the suffix of the by-id
+#                       link the udev rule creates for Ripple (keyboards),
+#                       and key_link_overlaps the other daemon classes whose
+#                       regex matches that link too
+#   [device.openrgb]    present when OpenRGB 1.1 supports the device
+#   [device.sources]    where the entry comes from:
+#                       razer       [sources] pages that list the device
+#                       openrazer   "<version> <driver> <wireless pid macro>"
+#                       openrgb     "<version> <razer_device record>"
+#                       public      owner data not taken through the
+#                                   receiver; openrazer#N is an issue or pull
+#                                   request on github.com/openrazer/openrazer
+#                       reports     device reports through the receiver
+#                       hardware    what has been used through the
+#                                   receiver on real hardware
+
+[receiver]
+name = "Razer HyperFlux V2"
+vendor_id = 0x1532
+product_id = 0x00cf
+pointer_lane_selector = 0x1f
+keyboard_lane_selector = 0x9f
+
+[openrazer]
+modules = ["razeraccessory", "razerkbd", "razerkraken", "razermouse"]
+patched_modules = ["razerkbd", "razermouse"]
+
+# Razer's pages as they were seen, with the ids of the devices each lists.
+# The tests read these, not the live pages, so update them when a page
+# changes. Razer names the Basilisk V3 Pro 35K without its editions; its
+# Phantom Green Edition is counted with it.
+[sources.razer-hyperflux-v2]
+url = "https://www.razer.com/gaming-mouse-mats/razer-hyperflux-v2-wireless-charging-system"
+seen = "2026-10-24"
+lists = { "Naga V3 Pro" = [0x00e8], "Basilisk V3 Pro 35K" = [0x00cd, 0x00d7], "Basilisk V3 Pro" = [0x00ab], "Cobra Pro" = [0x00b0], "Cobra HyperSpeed" = [0x00db], "Naga V2 Pro" = [0x00a8], "DeathStalker V2 Pro" = [0x0290], "DeathStalker V2 Pro Tenkeyless" = [0x0296], "BlackWidow V4 Tenkeyless HyperSpeed" = [0x02d5], "BlackWidow V4 Low-Profile HyperSpeed" = [0x02c9], "BlackWidow V4 Low-Profile Tenkeyless HyperSpeed" = [0x02d2], "BlackWidow V4 Mini HyperSpeed" = [0x02ba], "BlackWidow V3 Pro" = [0x025c] }
+
+[sources.razer-hyperflux-v2-launch]
+url = "https://www.razer.com/newsroom/product-news/razer-hyperflux-v2-wireless-charging-system"
+seen = "2026-10-24"
+lists = { "Basilisk V3 Pro 35K" = [0x00cd, 0x00d7], "Basilisk V3 Pro" = [0x00ab], "Cobra Pro" = [0x00b0], "Naga V2 Pro" = [0x00a8], "BlackWidow V4 Mini HyperSpeed" = [0x02ba], "BlackWidow V3 Pro" = [0x025c], "DeathStalker V2 Pro" = [0x0290], "DeathStalker V2 Pro Tenkeyless" = [0x0296] }
+
+[sources.razer-basilisk-v4-pro]
+url = "https://www.razer.com/gaming-mice/razer-basilisk-v4-pro/RZHB-261004-01"
+seen = "2026-10-26"
+lists = { "Basilisk V4 Pro" = [0x00e3] }
+
+[sources.razer-basilisk-v4-hyperspeed]
+url = "https://www.razer.com/gaming-mice/razer-basilisk-v4-hyperspeed"
+seen = "2026-10-26"
+lists = { "Basilisk V4 HyperSpeed" = [0x00ea] }
+
+[[device]]
+product_id = 0x00a8
+wired_product_id = 0x00a7
+kind = "mouse"
+name = "Razer Naga V2 Pro"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:05:1",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:85:1",
+    "00:86:2",
+    "03:01:5",
+    "03:0a:1",
+    "03:0d:3,7,10",
+    "03:10:1",
+    "04:05:7",
+    "04:06:38",
+    "04:85:7",
+    "04:86:38",
+    "07:01:1",
+    "07:03:2",
+    "07:80:2",
+    "07:81:1",
+    "07:83:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:11,14",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razermouse"
+class = "RazerNagaV2ProWireless"
+serial_transaction_id = 0x1f
+
+[device.openrgb]
+key = "naga_pro_v2_wireless_device"
+transaction_id = 0x1f
+rows = 1
+columns = 2
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_NAGA_V2_PRO_WIRELESS"
+openrgb = "1.1 naga_pro_v2_wireless_device"
+public = ["openrazer#1952", "openrazer#1991", "openrazer#2113"]
+reports = []
+
+[[device]]
+product_id = 0x00ab
+wired_product_id = 0x00aa
+kind = "mouse"
+name = "Razer Basilisk V3 Pro"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:05:1",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:85:1",
+    "00:86:2",
+    "02:14:2",
+    "02:16:2",
+    "02:17:2",
+    "02:94:2",
+    "02:96:2",
+    "02:97:2",
+    "04:05:7",
+    "04:06:38",
+    "04:85:7",
+    "04:86:38",
+    "07:01:1",
+    "07:03:2",
+    "07:80:2",
+    "07:81:1",
+    "07:83:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:44,71",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razermouse"
+class = "RazerBasiliskV3ProWireless"
+event_file_regex = '.*Razer_Basilisk_V3_Pro_000000000000-if0(1|2)-event-kbd'
+serial_transaction_id = 0x1f
+
+[device.openrgb]
+key = "basilisk_v3_pro_wireless_device"
+transaction_id = 0x1f
+rows = 1
+columns = 13
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_WIRELESS"
+openrgb = "1.1 basilisk_v3_pro_wireless_device"
+public = ["openrazer#1926", "openrazer#2589", "openrazer#2817"]
+reports = []
+
+[[device]]
+product_id = 0x00b0
+wired_product_id = 0x00af
+kind = "mouse"
+name = "Razer Cobra Pro"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:05:1",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:85:1",
+    "00:86:2",
+    "04:05:7",
+    "04:06:38",
+    "04:85:7",
+    "04:86:38",
+    "07:01:1",
+    "07:03:2",
+    "07:80:2",
+    "07:81:1",
+    "07:83:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:38",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razermouse"
+class = "RazerCobraProWireless"
+event_file_regex = '.*usb-Razer_Razer_Cobra_Pro-if0(1|2)-event-kbd'
+serial_transaction_id = 0x1f
+
+[device.openrgb]
+key = "cobra_pro_wireless_device"
+transaction_id = 0x1f
+rows = 1
+columns = 11
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_COBRA_PRO_WIRELESS"
+openrgb = "1.1 cobra_pro_wireless_device"
+public = ["openrazer#2105", "openrazer#2179"]
+reports = []
+
+[[device]]
+product_id = 0x00cd
+wired_product_id = 0x00cc
+kind = "mouse"
+name = "Razer Basilisk V3 Pro 35K"
+tier = "tested"
+charge = "mouse-status"
+first_get_delay_us = 3000
+commands = [
+    "00:04:2",
+    "00:05:1",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:85:1",
+    "00:86:2",
+    "02:14:2",
+    "02:16:2",
+    "02:17:2",
+    "02:94:2",
+    "02:96:2",
+    "02:97:2",
+    "04:05:7",
+    "04:06:38",
+    "04:85:7",
+    "04:86:38",
+    "07:01:1",
+    "07:03:2",
+    "07:80:2",
+    "07:81:1",
+    "07:83:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:44,71",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razermouse"
+class = "RazerBasiliskV3Pro35KWireless"
+event_file_regex = '.*Razer_Basilisk_V3_Pro_35K_000000000000-if0(1|2)-event-kbd'
+serial_transaction_id = 0x1f
+
+[device.openrgb]
+key = "basilisk_v3_pro_35k_wireless_device"
+transaction_id = 0x1f
+rows = 1
+columns = 13
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_35K_WIRELESS"
+openrgb = "1.1 basilisk_v3_pro_35k_wireless_device"
+public = ["openrazer#2681"]
+reports = []
+hardware = ["battery", "charging", "OpenRazer", "OpenRGB"]
+
+[[device]]
+product_id = 0x00d7
+wired_product_id = 0x00d6
+kind = "mouse"
+name = "Razer Basilisk V3 Pro 35K Phantom Green Edition"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:05:1",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:85:1",
+    "00:86:2",
+    "02:14:2",
+    "02:16:2",
+    "02:17:2",
+    "02:94:2",
+    "02:96:2",
+    "02:97:2",
+    "04:05:7",
+    "04:06:38",
+    "04:85:7",
+    "04:86:38",
+    "07:01:1",
+    "07:03:2",
+    "07:80:2",
+    "07:81:1",
+    "07:83:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:44,71",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razermouse"
+class = "RazerBasiliskV3Pro35KPhantomGreenEditionWireless"
+serial_transaction_id = 0x1f
+
+[device.openrgb]
+key = "basilisk_v3_pro_35k_pg_wireless_device"
+transaction_id = 0x1f
+rows = 1
+columns = 13
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_35K_PHANTOM_GREEN_EDITION_WIRELESS"
+openrgb = "1.1 basilisk_v3_pro_35k_pg_wireless_device"
+public = ["openrazer#2517"]
+reports = []
+
+[[device]]
+product_id = 0x00db
+wired_product_id = 0x00da
+kind = "mouse"
+name = "Razer Cobra HyperSpeed"
+tier = "listed"
+charge = "none"
+first_get_delay_us = 6000
+commands = []
+
+[device.sources]
+razer = ["razer-hyperflux-v2"]
+public = ["openrazer#2583"]
+reports = []
+
+[[device]]
+product_id = 0x00e3
+wired_product_id = 0x00e2
+kind = "mouse"
+name = "Razer Basilisk V4 Pro"
+tier = "listed"
+charge = "none"
+first_get_delay_us = 6000
+commands = []
+
+[device.sources]
+razer = ["razer-basilisk-v4-pro"]
+public = ["openrazer#2958"]
+reports = []
+
+[[device]]
+product_id = 0x00e8
+wired_product_id = 0x00e7
+kind = "mouse"
+name = "Razer Naga Pro V3"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "0f:02:6,9,12",
+    "0f:03:14",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+]
+
+# Only the plugin built against OpenRGB 1.1 has it; 1.0 has no record.
+[device.openrgb]
+key = "naga_pro_v3_wireless_device"
+transaction_id = 0x1f
+rows = 1
+columns = 3
+
+[device.sources]
+razer = ["razer-hyperflux-v2"]
+openrgb = "1.1 naga_pro_v3_wireless_device"
+public = []
+reports = []
+
+[[device]]
+product_id = 0x00ea
+wired_product_id = 0x00eb
+kind = "mouse"
+name = "Razer Basilisk V4 HyperSpeed"
+tier = "listed"
+charge = "none"
+first_get_delay_us = 6000
+commands = []
+
+[device.sources]
+razer = ["razer-basilisk-v4-hyperspeed"]
+public = ["openrazer#2955", "openrazer#2959"]
+reports = []
+
+[[device]]
+product_id = 0x025c
+wired_product_id = 0x025a
+kind = "keyboard"
+name = "Razer BlackWidow V3 Pro"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "03:00:3",
+    "03:01:5",
+    "03:02:3",
+    "03:10:1",
+    "03:80:3",
+    "03:82:3",
+    "07:01:1",
+    "07:80:2",
+    "07:81:1",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:71",
+    "0f:04:3",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razerkbd"
+class = "RazerBlackWidowV3ProWireless"
+event_file_regex = '.*Razer_Razer_BlackWidow_V3_Pro(_\d+)?(-if01)?-event-kbd'
+serial_transaction_id = 0xff
+key_event_link = "Razer_Razer_BlackWidow_V3_Pro-if01-event-kbd"
+key_link_overlaps = ["RazerBlackWidowV3ProWired"]
+
+[device.openrgb]
+key = "blackwidow_v3_pro_wireless_device"
+transaction_id = 0x3f
+rows = 6
+columns = 22
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V3_PRO_WIRELESS"
+openrgb = "1.1 blackwidow_v3_pro_wireless_device"
+public = ["openrazer#1279", "openrazer#1322", "openrazer#2024"]
+reports = []
+
+[[device]]
+product_id = 0x0290
+wired_product_id = 0x0292
+kind = "keyboard"
+name = "Razer DeathStalker V2 Pro"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "03:00:3",
+    "03:02:3",
+    "03:80:3",
+    "03:82:3",
+    "07:80:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:71",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razerkbd"
+class = "RazerDeathStalkerV2ProWireless"
+event_file_regex = '.*DSV2_Pro_000000000000-event-kbd'
+serial_transaction_id = 0xff
+key_event_link = "DSV2_Pro_000000000000-event-kbd"
+key_link_overlaps = ["RazerDeathStalkerV2ProWired"]
+
+[device.openrgb]
+key = "deathstalker_v2_pro_wireless_device"
+transaction_id = 0x9f
+rows = 6
+columns = 22
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_DEATHSTALKER_V2_PRO_WIRELESS"
+openrgb = "1.1 deathstalker_v2_pro_wireless_device"
+public = ["openrazer#1907", "openrazer#2001", "openrazer#2213"]
+reports = []
+
+[[device]]
+product_id = 0x0296
+wired_product_id = 0x0298
+kind = "keyboard"
+name = "Razer DeathStalker V2 Pro TKL"
+tier = "tested"
+charge = "keyboard-status"
+first_get_delay_us = 4000
+commands = [
+    "00:04:2",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "03:00:3",
+    "03:02:3",
+    "03:80:3",
+    "03:82:3",
+    "07:80:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:56,71",
+    "0f:04:3",
+    "0f:80:80",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razerkbd"
+class = "RazerDeathStalkerV2ProTKLWireless"
+event_file_regex = '.*DSV2Pro_TKL_000000000000-if01-event-mouse'
+serial_transaction_id = 0xff
+key_event_link = "DSV2Pro_TKL_000000000000-if01-event-mouse"
+key_link_overlaps = []
+
+[device.openrgb]
+key = "deathstalker_v2_pro_tkl_wireless_device"
+transaction_id = 0x9f
+rows = 6
+columns = 17
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_DEATHSTALKER_V2_PRO_TKL_WIRELESS"
+openrgb = "1.1 deathstalker_v2_pro_tkl_wireless_device"
+public = ["openrazer#1892"]
+reports = []
+hardware = ["battery", "charging", "OpenRazer", "OpenRGB", "Ripple"]
+
+[[device]]
+product_id = 0x02ba
+wired_product_id = 0x02b9
+kind = "keyboard"
+name = "Razer BlackWidow V4 Mini Hyperspeed"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "03:00:3",
+    "03:02:3",
+    "03:80:3",
+    "03:82:3",
+    "07:80:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:71",
+    "0f:04:3",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razerkbd"
+class = "RazerBlackWidowV4MiniHyperSpeedWireless"
+event_file_regex = '.*Razer_BlackWidow_V4_Mini_(-if01)?-event-kbd'
+serial_transaction_id = 0xff
+key_event_link = "Razer_BlackWidow_V4_Mini_-if01-event-kbd"
+key_link_overlaps = ["RazerBlackWidowV4MiniHyperSpeedWired"]
+
+[device.sources]
+razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
+openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V4_MINI_HYPERSPEED_WIRELESS"
+public = ["openrazer#2272", "openrazer#2585"]
+reports = []
+
+[[device]]
+product_id = 0x02c9
+wired_product_id = 0x02cc
+kind = "keyboard"
+name = "Razer BlackWidow V4 Low-profile HyperSpeed"
+tier = "listed"
+charge = "none"
+first_get_delay_us = 6000
+commands = []
+
+[device.sources]
+razer = ["razer-hyperflux-v2"]
+public = ["openrazer#2700"]
+reports = []
+
+[[device]]
+product_id = 0x02d2
+wired_product_id = 0x02d4
+kind = "keyboard"
+name = "Razer Blackwidow V4 Low Profile TKL"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "0f:02:6,9,12",
+    "0f:03:59",
+    "0f:04:3",
+    "0f:81:80",
+]
+
+[device.openrgb]
+key = "blackwidow_v4_lowprofile_tkl_wireless_device"
+transaction_id = 0x9f
+rows = 6
+columns = 18
+
+[device.sources]
+razer = ["razer-hyperflux-v2"]
+openrgb = "1.1 blackwidow_v4_lowprofile_tkl_wireless_device"
+public = ["openrazer#2593", "openrazer#2731", "openrazer#2912"]
+reports = []
+
+[[device]]
+product_id = 0x02d5
+wired_product_id = 0x02d7
+kind = "keyboard"
+name = "Razer BlackWidow V4 Tenkeyless HyperSpeed"
+tier = "checked"
+charge = "none"
+first_get_delay_us = 6000
+commands = [
+    "00:04:2",
+    "00:40:2",
+    "00:81:2",
+    "00:82:22",
+    "00:84:2",
+    "00:86:2",
+    "00:c0:1",
+    "03:00:3",
+    "03:80:3",
+    "07:80:2",
+    "07:84:2",
+    "0f:02:6,9,12",
+    "0f:03:59,71",
+    "0f:04:3",
+    "0f:81:80",
+    "0f:84:3",
+]
+
+[device.openrazer]
+driver = "razerkbd"
+class = "RazerBlackWidowV4TenkeylessHyperSpeedWireless"
+event_file_regex = '.*Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed(_\d+)?(-if01)?-event-mouse'
+serial_transaction_id = 0xff
+key_event_link = "Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed-if01-event-mouse"
+key_link_overlaps = []
+
+[device.openrgb]
+key = "blackwidow_v4_tkl_wireless_device"
+transaction_id = 0x9f
+rows = 6
+columns = 18
+
+[device.sources]
+razer = ["razer-hyperflux-v2"]
+openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V4_TENKEYLESS_HYPERSPEED_WIRELESS"
+openrgb = "1.1 blackwidow_v4_tkl_wireless_device"
+public = ["openrazer#2554", "openrazer#2579"]
+reports = []

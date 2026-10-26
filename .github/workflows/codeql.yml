@@ -1,0 +1,53 @@
+name: CodeQL
+
+# Static analysis of the Rust crates, the plugin and the C++ SDK, the
+# Python tests, scripts and SDK, and these workflows. Nothing is built:
+# CodeQL reads the sources, Rust's through rust-analyzer. Code scanning
+# needs a public repository, so a private one skips it.
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  analyze:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, c-cpp, python, rust]
+    name: analyze (${{ matrix.language }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned toolchain
+        if: matrix.language == 'rust'
+        run: rustup toolchain install && rustup component add rust-src
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:${{ matrix.language }}
