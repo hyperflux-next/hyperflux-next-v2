@@ -1,0 +1,20 @@
+Architectures: amd64
+Codename: stonking
+Components: main
+Date: Mon, 26 Oct 2026 17:03:13 +0000
+Description: HyperFlux Next V2 packages for Ubuntu
+Label: HyperFlux Next V2
+Origin: HyperFlux Next V2
+Suite: stonking
+MD5Sum:
+ 88966fcc39d7efca2e014e69395edaa4             5729 main/binary-amd64/Packages
+ 6d70f88e85d4b5698b0e045faaf7cf44             2082 main/binary-amd64/Packages.gz
+SHA1:
+ a4fd0a874e159b0f26e05bf3f1cabe3fc59792e7             5729 main/binary-amd64/Packages
+ 44d87fc210e6e128cbd4ce6921fb0349a685c03d             2082 main/binary-amd64/Packages.gz
+SHA256:
+ b25dde3902972323b361a929cbd5933181804f7adec1fa9ce0d67170cc1274eb             5729 main/binary-amd64/Packages
+ a8883053306949964ecfa3a55293591e3aba66504058179e699e95040a6fb826             2082 main/binary-amd64/Packages.gz
+SHA512:
+ bd461e90bcf9a6037426ec842fa99db574dc166ed2a4c5cad30a4387294f6fcb1c25bfad57d7687c2eb7f5cc30ac1744ef13b9c5df54aadf87568868084557a6             5729 main/binary-amd64/Packages
+ dc9506ad6cdfdc75dc0a32a566ed8e9209d4c87cec1aa40ddce6766a4b84cd6e7a37bbcd31a40354d51a2148ff2989c176f2081ffd178e600885712c6df1ba4e             2082 main/binary-amd64/Packages.gz

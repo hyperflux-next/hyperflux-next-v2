@@ -1,0 +1,20 @@
+Architectures: amd64
+Codename: forky
+Components: main
+Date: Mon, 26 Oct 2026 17:03:55 +0000
+Description: HyperFlux Next V2 packages for Debian
+Label: HyperFlux Next V2
+Origin: HyperFlux Next V2
+Suite: forky
+MD5Sum:
+ bac834044e534ddc64891cf64784b50b             5730 main/binary-amd64/Packages
+ a137c1f087a9be88d901a1f8ee88753c             2077 main/binary-amd64/Packages.gz
+SHA1:
+ 955671026fe10cb84ee0d94902c2a660fa9d9c80             5730 main/binary-amd64/Packages
+ f8dbc17d7f101b201c68f9a740d2bbcdb36205c0             2077 main/binary-amd64/Packages.gz
+SHA256:
+ d26e564baf33b3bcf80b21a1e99a491446b54c16ffd48e4909145f71d6aeefc0             5730 main/binary-amd64/Packages
+ 6713f0bb4d906d4a826f6058775d6dbc07cdb67d77b5d1e1116516667bec5f9e             2077 main/binary-amd64/Packages.gz
+SHA512:
+ ade36b47a89b1f5da6a8b03d0a366da0a85bfd1eb8307d6ce988405dd76b6c699e1ce0dcbeb5a53d5604dd9463e591017f26340e56f630f90323da50e9c86ec4             5730 main/binary-amd64/Packages
+ 2e8a82d421da5e12882624be091975b5c2bb2bfe535d1a7a062a72d4e3e6b44a323a9921f7c16bfbafd377ee6e89a3c51770f2c28da4f6c43c569228a1d154da             2077 main/binary-amd64/Packages.gz
