@@ -1,20 +1,20 @@
 Architectures: amd64
 Codename: forky
 Components: main
-Date: Fri, 30 Oct 2026 10:51:34 +0000
+Date: Fri, 30 Oct 2026 17:44:16 +0000
 Description: HyperFlux Next V2 packages for Debian
 Label: HyperFlux Next V2
 Origin: HyperFlux Next V2
 Suite: forky
 MD5Sum:
- c64815ec83866469579be1de0c2c207b            11460 main/binary-amd64/Packages
- 44ba1f1d1a8b70cfc456614eade7d16f             2904 main/binary-amd64/Packages.gz
+ 306e0a0a00354e605dccc8aa110bd9f7            11460 main/binary-amd64/Packages
+ 17a8f6e2a5494b54888719a1a626de15             2890 main/binary-amd64/Packages.gz
 SHA1:
- 158a7278b3e9ad648600e0437ca70e5819caf540            11460 main/binary-amd64/Packages
- acf6bdf308aa068f0fa7c147f279b3c3dc76ac14             2904 main/binary-amd64/Packages.gz
+ 739745ac8bbe9a072e187d7067ff7506caebb6d0            11460 main/binary-amd64/Packages
+ e003f293cf93485d73bcdf3dca3bd615ba84973b             2890 main/binary-amd64/Packages.gz
 SHA256:
- 389249b904e15eb1cba6fbb311b991ff19e447051ad1227e29c7bb5b7806a732            11460 main/binary-amd64/Packages
- 006696a5f50380048ec6d69c354068e479aabb9c481646b4334c198d47446574             2904 main/binary-amd64/Packages.gz
+ 9cf9def6268b13db98d8a5b93572f467ecb82fb5db9c051fb79e66955bc704ef            11460 main/binary-amd64/Packages
+ c31d82968175296e7e174be40eaef5f5f361efbdec8f0b1458eb4cbacd71494c             2890 main/binary-amd64/Packages.gz
 SHA512:
- 2f975f0490390fa628bdde7b2932db14cf1a8c59299d550b2785ac6baf2078abc0e3db9c08eed5175316b63d7cc6331ff48745e04cab898dd06e86953bfa872d            11460 main/binary-amd64/Packages
- e275e123185091fce02056405cefaaa5453220a1887194bfb600348a523c05ae35f7b8b747fd980198b86bbf9870b0b413c6f81517f8a2922f03029b8bf1f12a             2904 main/binary-amd64/Packages.gz
+ e3e07fdcd908e39a93316e7de5ef705a82855a1679da5a809fe472a2c7f288723f51a909ec8c733facfb07063f2125ba268eac4883d47e34cdf569a897b900aa            11460 main/binary-amd64/Packages
+ 4fe282e2eae2c5d48608aefa500386663d7cf3b416db7b7dba836e9b9c054831c3591489b8704f31ac8a910ef16e727cf88a8e785c313773a83b386fbc158642             2890 main/binary-amd64/Packages.gz
