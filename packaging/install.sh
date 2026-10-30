@@ -97,8 +97,9 @@ install_arch() {
         done
     fi
     say "Installing $pkgs"
-    # --ask 4 lets --yes replace Arch's openrazer-driver-dkms, which pacman
-    # would otherwise refuse without a question answered.
+    # With --noconfirm, pacman answers no when asked to remove a conflicting
+    # package, so it would stop at Arch's openrazer-driver-dkms. --ask 4
+    # answers yes to that question.
     # shellcheck disable=SC2086
     pm pacman -Syu --needed ${yes:+--noconfirm --ask 4} $pkgs
 }
