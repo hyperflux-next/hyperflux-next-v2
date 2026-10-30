@@ -39,7 +39,8 @@ the man page names the right version.
 - When the other end of a socket runs as the wrong account, the bridge and
   the device keeper say so without printing user ids.
 - `man hyperfluxctl` said 1.0.0 in 1.0.1. `scripts/set-version` now
-  updates the man page too, and a test checks it.
+  updates the man page and the bug report form too. Tests check them, and
+  the versions, releases, fingerprints and timings the docs quote.
 
 ### Signing key
 

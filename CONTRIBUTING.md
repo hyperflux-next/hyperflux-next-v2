@@ -28,6 +28,11 @@ Change them together with whatever depends on them. The tests in `tests/`
 check that the copies agree with `devices.toml`, and that it matches the
 pinned OpenRazer and OpenRGB.
 
+The docs quote some numbers from the code and the pins, such as how long a
+battery reading stays fresh or which Ubuntu release is supported.
+`tests/test_docs.py` lists each one, and fails until the page and its
+source say the same.
+
 A new crate needs a line in the root `Cargo.toml` saying why. Please
 don't paste serial numbers, receiver captures from someone else's
 machine, or private paths into issues, tests or commits.
