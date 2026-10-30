@@ -18,7 +18,7 @@
 %global old_names 1:1.0.1
 
 Name:           hyperflux-next-v2
-Version:        1.0.1
+Version:        1.0.2
 Release:        1%{?dist}
 Summary:        Razer devices on a HyperFlux V2 receiver
 License:        GPL-2.0-only
@@ -267,6 +267,9 @@ fi
 %endif
 
 %changelog
+* Fri Oct 30 2026 offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com> - 1.0.2-1
+- HyperFlux Next V2 1.0.2
+
 * Fri Oct 30 2026 offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com> - 1.0.1-1
 - HyperFlux Next V2 1.0.1
 

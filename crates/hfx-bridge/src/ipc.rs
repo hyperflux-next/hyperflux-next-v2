@@ -161,7 +161,7 @@ impl Channel {
             .uid
             .as_raw();
         if peer != uid {
-            return Err(format!("it runs as uid {peer}, not {uid}"));
+            return Err("it runs as the wrong user".into());
         }
         stream.set_nonblocking(true).map_err(|e| e.to_string())?;
         Ok(Self {

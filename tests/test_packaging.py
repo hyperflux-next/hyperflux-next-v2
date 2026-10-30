@@ -251,9 +251,8 @@ def test_install_script():
     assert pinned == hashlib.sha256(key.read_bytes()).hexdigest(), "install.sh pins another key file"
     assert f"SITE={makefile_var('SITE_URL')}\n" in script
     conf = dict(re.findall(r"(?m)^(\w+)=(\S+)$", read("packaging/repository.conf")))
-    assert f'"${{VERSION_ID:-}}" = {conf["UBUNTU_RELEASE"]} ] && target=ubuntu' in script
-    assert f'{conf["DEBIAN_SUITE"]}:* | *:{conf["DEBIAN_RELEASE"]}) target=debian' in script
-    assert f'"${{VERSION_ID:-}}" = {conf["FEDORA_RELEASE"]} ] && target=fedora' in script
+    for name in ("UBUNTU_SUITE", "UBUNTU_RELEASE", "DEBIAN_SUITE", "DEBIAN_RELEASE", "FEDORA_RELEASE"):
+        assert f"\n{name}={conf[name]}\n" in script, f"install.sh has another {name}"
     if shutil.which("gpg"):
         listing = subprocess.run(["gpg", "--batch", "--with-colons", "--show-keys", key],
                                  capture_output=True, text=True, check=True).stdout

@@ -33,8 +33,11 @@ trap 'rm -f "$archive"' EXIT
 curl -fsSL --retry 3 -o "$archive" "$source"
 case $source in
 https://cdn.kernel.org/*)
-    sums=$(curl -fsSL "${source%/*}/sha256sums.asc")
+    # The CDN can keep serving a sha256sums.asc from before the newest
+    # release, so ask for a copy past its cache.
+    sums=$(curl -fsSL -H 'Cache-Control: no-cache' "${source%/*}/sha256sums.asc?$(date +%s)")
     expected=$(awk -v f="${source##*/}" '$2 == f {print $1}' <<<"$sums")
+    [ -n "$expected" ] || { echo "kernel.org's sha256sums.asc has no line for ${source##*/} yet" >&2; exit 1; }
     [ "$(sha256sum <"$archive" | cut -d' ' -f1)" = "$expected" ] || { echo "checksum mismatch for $source" >&2; exit 1; }
     ;;
 esac

@@ -2,6 +2,53 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.2
+
+`install.sh` now runs on distributions based on a supported release,
+which it used to refuse. In the packages, one log message changed, and
+the man page names the right version.
+
+### Fixed
+
+- `install.sh` reads `ID_LIKE` from `/etc/os-release`, so a distribution
+  based on a supported release gets that release's packages.
+- On a distribution based on another Ubuntu release, `install.sh` says
+  which one and stops.
+- On Arch and the distributions based on it, Full now gets the headers for
+  each installed kernel that has a headers package in the repositories,
+  such as `linux-cachyos` or `linux-rt`. It used to look only for `linux`,
+  `linux-lts`, `linux-zen` and `linux-hardened`.
+- `install.sh` stops before changing anything on an image-based
+  distribution with a read-only `/usr`, such as Bazzite or SteamOS.
+- It also stops on a distribution that boots another init, such as Artix,
+  since the bridge is a systemd service.
+- On Arch, a package list left over from 2.x (signed with the old key)
+  broke the kernel header lookup, then stopped pacman. `install.sh` now
+  deletes that list first, and
+  [moving from 2.x](docs/user/moving-from-2x.md) tells you to delete it
+  too.
+- If pacman or zypper still uses the 2.x repository, `install.sh` stops and
+  links to [moving from 2.x](docs/user/moving-from-2x.md).
+- On Arch, gpg's notes about its trust database now show only if adding or
+  signing the key fails.
+- On openSUSE with Full, `install.sh` now enables `dkms.service`, which
+  openSUSE ships turned off. Without it the OpenRazer drivers were built
+  but never installed.
+- In [moving from 2.x](docs/user/moving-from-2x.md), the commands for
+  installing the release files now match the files' names.
+- When the other end of a socket runs as the wrong account, the bridge and
+  the device keeper say so without printing user ids.
+- `man hyperfluxctl` said 1.0.0 in 1.0.1. `scripts/set-version` now
+  updates the man page and the bug report form too. Tests check them, and
+  the versions, releases, fingerprints and timings the docs quote.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.1
 
 Nothing in the packages changed. This release adds a way to install them

@@ -1,14 +1,16 @@
 # Install on Ubuntu or Debian
 
-This guide covers Ubuntu 26.10 (stonking) and Debian 14 (forky). On
-Debian, Full includes the OpenRGB plugin, for Debian's own OpenRGB 1.0.
-On Ubuntu the plugin is optional and works with OpenRGB 1.1 from
-openrgb.org: see [the OpenRGB page](#the-openrgb-page).
+This guide covers Ubuntu 26.10 (stonking), Debian 14 (forky) and
+distributions based on them. On Debian, Full includes the OpenRGB plugin,
+for Debian's own OpenRGB 1.0. On Ubuntu the plugin is optional and works
+with OpenRGB 1.1 from openrgb.org: see [the OpenRGB page](#the-openrgb-page).
 
 Older releases aren't supported. Ubuntu 26.04 LTS and Debian 13 package
 OpenRazer versions that lack some of the supported keyboards, and Debian
-13 has no OpenRGB. Debian 14 is still Debian's testing release, and its
-own packages change more often than in a stable release.
+13 doesn't package OpenRGB. Anything based on an Ubuntu LTS release, such
+as Linux Mint or Pop!_OS, isn't supported either. Debian 14 is still
+Debian's testing release, and its own packages change more often than in
+a stable release.
 
 You need x86_64, the HyperFlux receiver plugged in with your keyboard and
 mouse paired to it, and an account that can use `sudo`. Keep the
@@ -20,17 +22,17 @@ If you'd rather not type the steps below, this does 1 to 3 in one go:
 curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
 ```
 
-It takes `linux-headers-generic` on Ubuntu and `linux-headers-amd64` on
-Debian, and apt lists the packages and asks before installing them. The
-optional OpenRGB plugin for Ubuntu is left to you
+With Full it also installs `linux-headers-generic` on Ubuntu or
+`linux-headers-amd64` on Debian. apt lists the packages and asks before
+installing them. The optional OpenRGB plugin for Ubuntu is left to you
 ([the OpenRGB page](#the-openrgb-page)). For Core, end the line with
 `sh -s -- --core`.
 
 ## 1. Add the repository
 
-You do this once. The HyperFlux Next V2 project runs the repository, not
-your distribution. Its package lists are signed with the project signing
-key, and apt rejects them without it.
+You do this once. The project runs this repository itself. Its package
+lists are signed with the project signing key, and apt rejects them
+without it.
 
 ```sh
 sudo install -d -m 0755 /etc/apt/keyrings
@@ -51,8 +53,7 @@ sudo curl --proto '=https' --tlsv1.2 -fL -o /etc/apt/sources.list.d/hyperflux-ne
   https://hyperflux-next.github.io/hyperflux-next-v2/ubuntu/hyperflux-next.sources
 ```
 
-The file has six lines. On Debian the address ends in `/debian` and the
-suite is `forky`:
+Ubuntu's file looks like this:
 
 ```text
 Types: deb
@@ -62,6 +63,8 @@ Components: main
 Architectures: amd64
 Signed-By: /etc/apt/keyrings/hyperflux-next.asc
 ```
+
+On Debian the address ends in `/debian` and the suite is `forky`.
 
 ## 2. Install
 
@@ -89,17 +92,15 @@ replaces it. Full brings its own build of the same driver, and the stock
 
 ## 3. Enable and reboot
 
-Installing starts nothing. Enable the bridge and your desktop's socket
-for it, then reboot:
+Installing starts nothing. With Full and Secure Boot on, first enrol the
+DKMS key, as [Secure Boot](secure-boot.md) shows. Until you do, the
+OpenRazer drivers will not load. Then enable the bridge and your own
+socket, and reboot:
 
 ```sh
 sudo systemctl enable hyperflux-next-bridge.service "hyperflux-next-client@$(id -u).socket"
 sudo reboot
 ```
-
-With Full and Secure Boot on, enrol the DKMS key before you reboot, as
-[Secure Boot](secure-boot.md) shows. Until you do, the OpenRazer drivers
-will not load.
 
 Other desktop users each need their own
 `hyperflux-next-client@UID.socket`.
@@ -133,8 +134,8 @@ sudo gpasswd -a "$USER" plugdev
 
 OpenRazer talks to members of `plugdev` and nobody else, so log out and
 back in after joining. Polychromatic is not packaged in Ubuntu 26.10 or
-Debian 14. Its website, polychromatic.app, lists other ways to install
-it. Then see [first run](first-run.md).
+Debian 14. [Its website](https://polychromatic.app) lists other ways to
+install it. Then see [first run](first-run.md).
 
 ## The OpenRGB page
 

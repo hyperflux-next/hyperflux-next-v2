@@ -21,11 +21,17 @@ shows how to run the whole stack against the simulator, with no hardware.
 To build and test the packages for one distribution in its container,
 run `scripts/package.sh TARGET --install-test`.
 
-Some files are contracts between parts: `docs/protocol.md` with the
-fixtures in `crates/hfx-proto/tests/fixtures/`, `crates/hfx-proto` and
-`devices.toml`. Change them together with whatever depends on them. The
-tests in `tests/` check that the copies agree, and that the catalogue
-matches the pinned OpenRazer and OpenRGB.
+Some files are contracts between parts. `docs/protocol.md` goes with the
+fixtures in `crates/hfx-proto/tests/fixtures/`, and `devices.toml` has
+copies in `crates/hfx-proto`, the OpenRazer patch and the OpenRGB plugin.
+Change them together with whatever depends on them. The tests in `tests/`
+check that the copies agree with `devices.toml`, and that it matches the
+pinned OpenRazer and OpenRGB.
+
+The docs quote some numbers from the code and the pins, such as how long a
+battery reading stays fresh or which Ubuntu release is supported.
+`tests/test_docs.py` lists each one, and fails until the page and its
+source say the same.
 
 A new crate needs a line in the root `Cargo.toml` saying why. Please
 don't paste serial numbers, receiver captures from someone else's
