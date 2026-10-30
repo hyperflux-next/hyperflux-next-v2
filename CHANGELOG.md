@@ -4,8 +4,8 @@ Each section is also the release's notes on GitHub.
 
 ## 1.0.2
 
-Nothing in the packages changed. `install.sh` now runs on distributions
-based on a supported release, which it used to refuse.
+`install.sh` now runs on distributions based on a supported release,
+which it used to refuse. In the packages, only one log message changed.
 
 ### Fixed
 
@@ -35,6 +35,8 @@ based on a supported release, which it used to refuse.
   but never installed.
 - In [moving from 2.x](docs/user/moving-from-2x.md), the commands for
   installing the release files now match the files' names.
+- When the other end of a socket runs as the wrong account, the bridge and
+  the device keeper say so without printing user ids.
 
 ### Signing key
 
