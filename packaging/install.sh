@@ -32,6 +32,14 @@ die() {
 }
 as_root() { if [ -n "$sudo" ]; then sudo "$@"; else "$@"; fi; }
 fetch() { curl --proto '=https' --tlsv1.2 -fsSL -o "$2" "$1"; }
+# Shows a command's output only when it fails. pacman-key passes on gpg's
+# trust database notes, which read like errors and aren't.
+quiet() {
+    out=$("$@" 2>&1) || {
+        printf '%s\n' "$out" >&2
+        return 1
+    }
+}
 
 # A step that fails stops everything after it. die has said why already.
 cleanup() {
@@ -62,8 +70,8 @@ install_arch() {
     *) die "pacman still uses the 2.x repository at $server. Remove that entry as $MOVING shows, then run this again." ;;
     esac
     say "Giving the key to pacman"
-    as_root pacman-key --add "$tmp/key.asc" >/dev/null
-    as_root pacman-key --lsign-key "$KEY_FPR" >/dev/null
+    quiet as_root pacman-key --add "$tmp/key.asc"
+    quiet as_root pacman-key --lsign-key "$KEY_FPR"
     if [ -z "$server" ]; then
         say "Adding the repository to /etc/pacman.conf"
         printf '\n[hyperflux-next]\nSigLevel = Required DatabaseRequired TrustedOnly\nServer = %s/arch\n' "$SITE" |
