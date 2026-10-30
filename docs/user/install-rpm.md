@@ -6,6 +6,10 @@ distribution ships an OpenRGB that can load the HyperFlux Next V2 plugin
 (both package a 1.0 release candidate), but on Fedora, OpenRGB 1.1 from
 openrgb.org can, as [the OpenRGB page](#the-openrgb-page) shows.
 
+Distributions based on Fedora 44 or Tumbleweed can use the same packages.
+Image-based ones such as Bazzite or openSUSE Aeon keep `/usr` read-only,
+so the packages can't be installed on them.
+
 You need the HyperFlux receiver plugged in with your keyboard and mouse
 paired to it, and an account that can use `sudo`. Keep the receiver,
 keyboard and mouse connected the whole time.
@@ -17,17 +21,17 @@ curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
 ```
 
 Along with Full it installs `kernel-devel` on Fedora and
-`kernel-default-devel` on openSUSE. dnf asks about the project key a
-second time, for the package list, as step 2 explains: answer `y`. If
+`kernel-default-devel` on openSUSE, where it also enables `dkms.service`
+(step 3 says why). dnf asks whether to import the project key for the
+package list, as step 2 explains: answer `y`. If
 OpenRazer's own `openrazer-kernel-modules-dkms` is installed, dnf replaces
 it and zypper asks you how to solve the conflict. For Core, end the line
 with `sh -s -- --core`.
 
 ## 1. Add the repository
 
-You do this once. The repository is run by the HyperFlux Next V2 project,
-not by your distribution, and the packages and the package list are
-signed with the project signing key.
+You do this once. The repository is the HyperFlux Next V2 project's own,
+and the packages and the package list are signed with its signing key.
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fLO https://hyperflux-next.github.io/hyperflux-next-v2/hyperflux-next-repository-key.asc
@@ -101,15 +105,15 @@ brings its own build of the same driver.
 
 ## 3. Enable and reboot
 
-Installing starts nothing. Enable the bridge and your desktop's socket
-for it, then reboot:
+Installing starts nothing. With Full and Secure Boot on, first enrol the
+DKMS key, as [Secure Boot](secure-boot.md) shows. Then enable the bridge
+and your own socket. On Fedora, or on openSUSE with Core:
 
 ```sh
 sudo systemctl enable hyperflux-next-bridge.service "hyperflux-next-client@$(id -u).socket"
-sudo reboot
 ```
 
-With Full on openSUSE, also enable `dkms.service`. openSUSE ships it
+With Full on openSUSE, enable `dkms.service` too. openSUSE ships it
 turned off, and it is what installs the OpenRazer drivers for your kernel
 at boot:
 
@@ -117,9 +121,14 @@ at boot:
 sudo systemctl enable dkms.service hyperflux-next-bridge.service "hyperflux-next-client@$(id -u).socket"
 ```
 
-With Full and Secure Boot on, enrol the DKMS key before you reboot, as
-[Secure Boot](secure-boot.md) shows. Other desktop users each need their
-own `hyperflux-next-client@UID.socket`.
+Then reboot:
+
+```sh
+sudo reboot
+```
+
+Other desktop users each need their own
+`hyperflux-next-client@UID.socket`.
 
 ## 4. Check
 

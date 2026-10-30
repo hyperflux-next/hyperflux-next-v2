@@ -28,7 +28,7 @@ body:
       description: >-
         Distribution, kernel (`uname -r`) and HyperFlux Next V2 version: `pacman -Q hyperflux-next-v2-linux`,
         `dpkg-query -W hyperflux-next-v2-linux` or `rpm -q hyperflux-next-v2-linux`.
-      placeholder: Arch Linux, 7.2.11-arch1-1, 1.0.0-1
+      placeholder: Arch Linux, 7.2.11-arch1-1, 1.0.2-1
     validations:
       required: true
   - type: textarea

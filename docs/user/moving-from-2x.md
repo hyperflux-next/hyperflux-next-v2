@@ -5,8 +5,8 @@ start again, and its packages have new names. Each new package takes the
 place of an old one:
 
 - `hyperflux-next-linux` becomes `hyperflux-next-v2-linux`.
-- `hyperflux-next-dkms` has no successor. 1.0 has no receiver kernel
-  module, and `hyperflux-next-v2-linux` replaces it.
+- `hyperflux-next-dkms` goes, and `hyperflux-next-v2-linux` replaces it.
+  1.0 has no receiver kernel module.
 - `hyperflux-next-openrazer-driver-dkms` becomes
   `hyperflux-next-v2-openrazer-driver-dkms`.
 - `hyperflux-next-full` becomes `hyperflux-next-v2-full`.
@@ -29,8 +29,12 @@ points at the 2.x repository, and you need to swap the entry once.
      you have. Then run:
 
      ```sh
-     sudo rm -f /etc/pacman.d/hyperflux-next.conf
+     sudo rm -f /etc/pacman.d/hyperflux-next.conf /var/lib/pacman/sync/hyperflux-next.*
      ```
+
+     The second path is pacman's copy of the 2.x package list. The new
+     repository has the same name, so pacman would check that list against
+     the new key and stop.
 
      The old key is still trusted. `pacman-key --list-keys` shows its
      fingerprint. Remove it with:
@@ -120,15 +124,18 @@ Switch them as above, then reboot.
 
 If you installed the test build from files, install the new files the
 same way. Install them all at once, or just the `linux` one for Core. On
-Ubuntu and Fedora, leave the `openrgb-plugin` file out unless you have
-OpenRGB 1.1 from openrgb.org. The OpenRGB page section of your install
-guide explains why.
+Ubuntu and Fedora, don't download the `openrgb-plugin` file unless you
+have OpenRGB 1.1 from openrgb.org. The OpenRGB page section of your
+install guide ([Ubuntu](install-apt.md#the-openrgb-page),
+[Fedora](install-rpm.md#the-openrgb-page)) explains why.
 
-- Arch: `sudo pacman -U ./hyperflux-next-v2-*.pkg.tar.zst`, and answer
-  `y` when it asks to remove each conflicting `hyperflux-next-*` package
-- Ubuntu and Debian: `sudo apt install ./hyperflux-next-v2-*.deb`
-- Fedora: `sudo dnf install ./hyperflux-next-v2-*.rpm`
-- openSUSE: `sudo zypper install ./hyperflux-next-v2-*.rpm`
+- Arch: `sudo pacman -U ./arch-hyperflux-next-v2-*.pkg.tar.zst`, and
+  answer `y` when it asks to remove each conflicting `hyperflux-next-*`
+  package
+- Ubuntu: `sudo apt install ./ubuntu-hyperflux-next-v2-*.deb`
+- Debian: `sudo apt install ./debian-hyperflux-next-v2-*.deb`
+- Fedora: `sudo dnf install ./fedora-hyperflux-next-v2-*.rpm`
+- openSUSE: `sudo zypper install ./opensuse-hyperflux-next-v2-*.rpm`
 
 The notes on [what Ubuntu and Debian keep](#what-ubuntu-and-debian-keep)
 apply here as well.
@@ -163,8 +170,8 @@ Other changes:
   their own lighting settings.
 - Batteries appear sooner. The bridge asks each device for its battery at
   start and after resume, instead of waiting for the device to report it.
-  An old reading stays in the battery widget, marked stale, rather than
-  disappearing.
+  An old reading stays in the battery widget, and after 30 minutes
+  `hyperfluxctl` and the OpenRGB page mark it stale.
 - All the checked devices are offered to apps, labelled
   `not yet tested through the receiver`. 2.x offered the two tested
   devices and no others.
@@ -195,10 +202,9 @@ To go back, first remove the `hyperflux-next-v2-*` packages. They
 replace the old names, and package managers will not install 2.2.0 next to
 them.
 
-Then install all four 2.2.0 packages (`hyperflux-next-dkms` included)
-from the old repository or your package cache. Nowhere else has 2.2.0.
-If it is not in your cache, point your system back at the old
-repository first. Reboot afterwards.
+If 2.2.0 isn't in your package cache, point your system back at the old
+repository and trust its key again. Nowhere else has 2.2.0. Then install
+all four 2.2.0 packages, `hyperflux-next-dkms` included, and reboot.
 
 If the switch goes wrong in a way Doctor doesn't explain, please open a
 bug report. [Asking for help](troubleshooting.md#asking-for-help) says

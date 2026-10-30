@@ -152,7 +152,7 @@ bridge_on_simulator() {
     # is turned away for its uid.
     setpriv --reuid=65534 --regid=hyperflux --clear-groups "$keeper_bin" --sim "$work/sim.sock" 2>"$work/other.log" &
     local other_pid=$!
-    within 10 grep -q 'refused a device keeper: it runs as uid 65534' "$work/bridge.log" ||
+    within 10 grep -q 'refused a device keeper: it runs as the wrong user' "$work/bridge.log" ||
         { cat "$work/bridge.log" "$work/other.log" >&2; fail "the bridge took a keeper of another user"; }
     kill "$other_pid"
     wait "$other_pid" 2>/dev/null || true

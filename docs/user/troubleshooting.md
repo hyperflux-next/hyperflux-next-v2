@@ -115,9 +115,9 @@ query the bridge and apps send.
 The output lists every gap over 50 ms in the movement, each with whatever
 HyperFlux Next V2 sent to a device at that moment, plus any USB resets or
 disconnects from the kernel log. At the end the check
-compares the two halves and gives a verdict. A stall that overlaps a
-query happened at the same time as it, and that is all it shows, but the
-comparison between the halves tells you more. Lighting changes are not
+compares the two halves and gives a verdict. An overlap only means a
+stall and a query happened at the same time. The comparison between the
+halves tells you more. Lighting changes are not
 recorded by the bridge, so the check cannot match stalls with them.
 
 Reading the mouse's input needs the `input` group. Without it the check
@@ -259,7 +259,7 @@ keeper reads interfaces 0 and 1. Core's udev rule sets them up like this:
 - interface 1: group `hyperflux-keeper`, mode 0640
 - interface 4: group `hyperflux-next`, mode 0660
 
-If Doctor also reports [HFX-303](#hfx-303), deal with that first. To apply
+If Doctor also reports [HFX-303](#hfx-303), fix that first. To apply
 the rule, unplug the receiver for a few seconds and then plug it in again,
 or reboot.
 
@@ -279,9 +279,9 @@ of the `hyperflux` group. Enable your own socket once:
 sudo systemctl enable --now "hyperflux-next-client@$(id -u).socket"
 ```
 
-Each desktop user needs one. Don't join the `hyperflux-next` or
-`hyperflux-keeper` group to get around this. Those groups belong to the
-bridge and the device keeper.
+Each desktop user needs one, so there's no need to join `hyperflux`.
+Don't join `hyperflux-next` or `hyperflux-keeper` to get around this
+either. Those groups belong to the bridge and the device keeper.
 
 ### HFX-205
 
@@ -390,7 +390,7 @@ When nothing but the loaded copy is left, a reboot is enough.
 Secure Boot is keeping the kernel from loading the OpenRazer drivers
 that come with Full (Core has no kernel module). It lets a module in when
 the firmware trusts the key it was signed with, and because DKMS signs
-the drivers with a key generated on your computer, you enroll that key
+the drivers with a key generated on your computer, you enrol that key
 once:
 
 ```sh

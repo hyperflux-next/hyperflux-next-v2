@@ -88,7 +88,7 @@ Ubuntu and Debian, the next `apt autoremove` does the same.
   sudo zypper remove hyperflux-next-v2-full hyperflux-next-v2-openrazer-driver-dkms
   ```
 
-After that, apps can't reach the receiver's devices. If you use
+After that, OpenRazer apps can't reach the receiver's devices. If you use
 OpenRazer, install your distribution's own driver again:
 `openrazer-driver-dkms` on Arch, Ubuntu and Debian, or
 `openrazer-kernel-modules-dkms` from `hardware:razer` on Fedora and

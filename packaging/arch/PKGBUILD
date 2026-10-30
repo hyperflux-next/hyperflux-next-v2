@@ -11,7 +11,7 @@
 pkgbase=hyperflux-next-v2
 pkgname=(hyperflux-next-v2-linux hyperflux-next-v2-openrazer-driver-dkms hyperflux-next-v2-full
          hyperflux-next-v2-openrgb-plugin)
-pkgver=1.0.1
+pkgver=1.0.2
 pkgrel=1
 arch=('x86_64')
 url='https://github.com/hyperflux-next/hyperflux-next-v2'

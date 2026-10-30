@@ -3,8 +3,8 @@
 """set-version [--root DIR] X.Y.Z
 
 Sets the product version everywhere it's written down: the workspace
-Cargo.toml and Cargo.lock, the OpenRGB plugin, both SDKs and the three
-package recipes. It also adds Debian and RPM changelog entries and an
+Cargo.toml and Cargo.lock, the OpenRGB plugin, both SDKs, the three
+package recipes, the man page and the bug report form. It also adds Debian and RPM changelog entries and an
 empty CHANGELOG.md section for the release notes. tests/test_versions.py
 checks that all these places agree."""
 
@@ -24,6 +24,8 @@ LINES = [
     ("sdk/python/pyproject.toml", r'(?m)^(version = ")[^"]*'),
     ("packaging/arch/PKGBUILD", r"(?m)^(pkgver=).*"),
     ("packaging/rpm/hyperflux-next-v2.spec", r"(?m)^(Version:\s+).*"),
+    ("man/hyperfluxctl.1", r'(?m)^(\.TH HYPERFLUXCTL 1 \S+ "HyperFlux Next V2 )[0-9.]+'),
+    (".github/ISSUE_TEMPLATE/bug_report.yml", r"(?m)^(\s+placeholder: Arch Linux, \S+ )[0-9.]+"),
 ]
 
 

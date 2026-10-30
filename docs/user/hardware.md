@@ -11,16 +11,18 @@ and left alone.
 
 The status column has three values.
 
-- tested: I have used the device through the receiver with HyperFlux
-  Next V2, on my own Arch machine. That covers battery, charging, and
-  lighting from OpenRazer and OpenRGB, plus Ripple on the keyboard.
+- tested: the device has been used through the receiver with HyperFlux
+  Next V2, on my own machine or in an owner's
+  [device report](#reporting-a-device). On mine that covers battery,
+  charging, and lighting from OpenRazer and OpenRGB, plus Ripple on the
+  keyboard.
 - checked: Razer lists the device as working with the HyperFlux V2.
   OpenRazer 3.12.4 or OpenRGB 1.1 supports it, and the entry in
   `devices.toml` matches theirs. It is
   not tested through the receiver. `hyperfluxctl` and the OpenRGB page
   say `not yet tested through the receiver`.
 - listed: Razer lists the device, but neither release drives it. Until
-  one does, the bridge has nothing to pass its commands to.
+  one does, no app sends it commands for the bridge to pass on.
 
 | Device | Kind | Through the receiver | By cable | Status | Works in |
 | --- | --- | --- | --- | --- | --- |
@@ -46,15 +48,15 @@ you use them together. Razer Synapse installs it, and Synapse runs on
 Windows.
 
 In the last column, "OpenRazer" includes the apps built on it
-(Polychromatic, for example). OpenRGB needs the plugin. Full brings it on
-Arch and Debian, and on Ubuntu and Fedora it comes as a separate package
-for OpenRGB 1.1 from openrgb.org. "OpenRGB 1.1" means the plugin for
-OpenRGB 1.1 and not Debian's, which is for 1.0.
+(Polychromatic, for example). OpenRGB needs the plugin, and
+[which OpenRGB loads the plugin](limitations.md#which-openrgb-loads-the-plugin)
+says where it comes from. "OpenRGB 1.1" means the plugin for OpenRGB 1.1
+and not Debian's, which is for 1.0.
 
 `hyperfluxctl`, the battery widget and the apps use the upstream names.
-Three of them differ from the table: Naga Pro V3, Blackwidow V4 Low
-Profile TKL and BlackWidow V4 Mini Hyperspeed. The four listed devices
-are waiting for OpenRazer or OpenRGB to support them at all.
+These differ from the table: Naga Pro V3, Blackwidow V4 Low
+Profile TKL, BlackWidow V4 Mini Hyperspeed and BlackWidow V4 Low-profile
+HyperSpeed.
 
 ## The checked devices
 
@@ -86,10 +88,9 @@ captures show them answering the charging question, with 1 on their cables.
 
 Only the Basilisk V3 Pro 35K says whether it's on its mat.
 
-The desktop's battery widget shows a device without a charging state as
-discharging, even on its cable, because that is what the kernel reports for
-it. OpenRazer apps may still say charging, since they ask the device
-themselves.
+Without a charging state, the desktop's battery widget shows a device as
+discharging ([limitations](limitations.md#batteries) says why). OpenRazer
+apps may still say charging, since they ask the device themselves.
 
 Ripple on a keyboard needs its key presses on the receiver's keyboard
 node. The DeathStalker V2 Pro TKL delivers them there.
@@ -112,8 +113,8 @@ By cable a device has its wired id, the one in the table above. While a
 wired device with that id is bound to its OpenRazer driver, the bridge takes
 away the copy it made for OpenRazer through the receiver, and OpenRazer and
 Polychromatic then list the device once, as the wired one. The bridge does
-this as soon as the kernel announces the wired device, before OpenRazer gets
-to it. It makes the copy again when the cable comes out. In the meantime
+this as soon as the kernel announces the wired device, before openrazer-daemon
+picks it up. It makes the copy again when the cable comes out. In the meantime
 `hyperfluxctl devices` says `openrazer: on its cable`. The battery entry
 stays, and the other device on the receiver is unaffected.
 
@@ -134,8 +135,8 @@ Without a hash to compare (an older driver that lacks the attribute, or an
 unreadable serial), the bridge goes by the wired id alone, and a second
 unit's cable then hides the paired device's copy while it is plugged in.
 
-The hash is not the serial, so neither the report nor the attribute
-gives the serial away. Still, it is no real secret
+The hash is not the serial, so the attribute doesn't give the serial
+away. Still, it is no real secret
 ([privacy](privacy.md#who-on-the-computer-can-see-what) says why). It
 keeps the serial out of plain sight and nothing more.
 
@@ -154,13 +155,12 @@ to:
 - plug the cable in and out
 - let the device sleep and wake
 
-The result is one `hyperflux-next-report-*.json` file. It holds the
-output of `devices`, `doctor`, `probe receiver` and `bench --defaults`,
-the guided capture, and this boot's log lines from the bridge and the
-device keeper. Key presses and pointer movement are not recorded. There
-are no serial numbers in it either, and
-[privacy](privacy.md#files-for-bug-reports) lists what else it leaves
-out.
+The result is one `hyperflux-next-report-*.json` file. It holds the output
+of `devices`, `doctor`, `probe receiver` and `bench --defaults`, the guided
+capture, and the lines of this boot's bridge and keeper logs about
+OpenRazer, refused commands, serials and the cable. Key presses and pointer
+movement are not recorded. There are no serial numbers in it either, and
+[privacy](privacy.md#files-for-bug-reports) lists what else it leaves out.
 
 Then open a
 [device report](https://github.com/hyperflux-next/hyperflux-next-v2/issues/new?template=device_support.yml),
