@@ -256,10 +256,16 @@ main() {
     esac
 
     say "Enabling the bridge and your socket"
+    units=hyperflux-next-bridge.service
+    # openSUSE ships dkms.service turned off, and the driver package leaves
+    # installing the OpenRazer drivers to it at the next boot.
+    [ "$target" = opensuse ] && [ "$edition" = full ] && units="dkms.service $units"
     if [ -n "$uid" ] && [ "$uid" != 0 ]; then
-        as_root systemctl enable hyperflux-next-bridge.service "hyperflux-next-client@$uid.socket"
+        # shellcheck disable=SC2086
+        as_root systemctl enable $units "hyperflux-next-client@$uid.socket"
     else
-        as_root systemctl enable hyperflux-next-bridge.service
+        # shellcheck disable=SC2086
+        as_root systemctl enable $units
         echo "Each desktop user also needs their socket: systemctl enable hyperflux-next-client@UID.socket"
     fi
 
