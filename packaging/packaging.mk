@@ -59,7 +59,7 @@ $(addprefix install-test-,$(PACKAGE_TARGETS)): install-test-%:
 # resolves the rules' user and group names, which exist only once Core is
 # installed.
 lint-packaging:
-	shellcheck -x scripts/*.sh packaging/debian/*.postinst packaging/debian/*.prerm packaging/debian/*.postrm
+	shellcheck -x scripts/*.sh packaging/install.sh packaging/debian/*.postinst packaging/debian/*.prerm packaging/debian/*.postrm
 	udevadm verify --no-style --resolve-names=late udev/99-hyperflux-next.rules
 	root=$$(mktemp -d) && trap 'rm -rf "$$root"' EXIT && \
 	$(MAKE) -s install-linux-files DESTDIR="$$root" && \

@@ -89,6 +89,9 @@ cat >"$site/index.html" <<EOF
 <p>HyperFlux Next V2 $version for Arch Linux, Ubuntu $UBUNTU_RELEASE, Debian $DEBIAN_RELEASE,
 Fedora $FEDORA_RELEASE and openSUSE Tumbleweed. Follow the install guide for your
 distribution; it adds this repository and checks the project signing key.</p>
+<p>Or paste one line. It runs the guide's steps for you and asks before it
+installs anything:</p>
+<pre>curl -fsSL $site_url/install.sh | sh</pre>
 <ul>
 <li><a href="$project_url/blob/main/docs/user/install-arch.md">Arch Linux</a></li>
 <li><a href="$project_url/blob/main/docs/user/install-apt.md">Ubuntu and Debian</a></li>
@@ -97,5 +100,6 @@ distribution; it adds this repository and checks the project signing key.</p>
 <p>Source, issues and release notes: <a href="$project_url">$project_url</a></p>
 </html>
 EOF
+install -m 0644 packaging/install.sh "$site/install.sh"
 touch "$site/.nojekyll"
 echo "Unsigned site for $version is in $site"
