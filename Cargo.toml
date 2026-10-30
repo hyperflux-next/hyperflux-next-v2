@@ -9,7 +9,7 @@ members = [
 # The product version. scripts/set-version changes it here and in the other
 # version locations listed in ARCHITECTURE.md; a test checks they agree.
 [workspace.package]
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 rust-version = "1.95"
 license = "GPL-2.0-only"

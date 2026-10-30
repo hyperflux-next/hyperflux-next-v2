@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 cmake_minimum_required(VERSION 3.20)
-project(hyperflux-sdk VERSION 1.0.1 LANGUAGES CXX)
+project(hyperflux-sdk VERSION 1.0.2 LANGUAGES CXX)
 
 # The plugin builds with the nlohmann/json copy inside the pinned OpenRGB
 # tree, and so does sdk-test. Without a directory, an installed nlohmann_json
