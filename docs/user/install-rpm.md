@@ -10,6 +10,19 @@ You need the HyperFlux receiver plugged in with your keyboard and mouse
 paired to it, and an account that can use `sudo`. Keep the receiver,
 keyboard and mouse connected the whole time.
 
+Steps 1 to 3 can also be done by a script:
+
+```sh
+curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
+```
+
+Along with Full it installs `kernel-devel` on Fedora and
+`kernel-default-devel` on openSUSE. dnf asks about the project key a
+second time, for the package list, as step 2 explains: answer `y`. If
+OpenRazer's own `openrazer-kernel-modules-dkms` is installed, dnf replaces
+it and zypper asks you how to solve the conflict. For Core, end the line
+with `sh -s -- --core`.
+
 ## 1. Add the repository
 
 You do this once. The repository is run by the HyperFlux Next V2 project,

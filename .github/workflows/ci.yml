@@ -175,3 +175,21 @@ jobs:
           name: packages-${{ matrix.target }}
           path: dist/${{ matrix.target }}/
           retention-days: 14
+
+  all-packages:
+    # The one check the branch rules require for the package builds. When
+    # nothing they're made from changed, the matrix job is skipped and
+    # reports as plain "packages", which a rule can't wait for by target.
+    needs: [changes, packages]
+    if: always()
+    name: all packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every package build passed, or none was needed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          PACKAGES: ${{ needs.packages.result }}
+        run: |
+          echo "changes: $CHANGES, packages: $PACKAGES"
+          [ "$CHANGES" = success ] && { [ "$PACKAGES" = success ] || [ "$PACKAGES" = skipped ]; }

@@ -101,7 +101,7 @@ fn hello_negotiation() {
     let result = &welcome["result"];
     assert_eq!(result["version"], 1);
     assert_eq!(result["features"], json!(["native-routes", "wait"]));
-    assert_eq!(result["bridge_version"], "1.0.0");
+    assert_eq!(result["bridge_version"], hfx_proto::PRODUCT_VERSION);
     assert!(
         result["server_instance_id"]
             .as_str()

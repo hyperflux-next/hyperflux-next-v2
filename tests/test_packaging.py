@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-only
 """The packaging and the docs agree with the contracts they copy from:
-error codes, devices, upstream pins, the bridge unit, the project URLs and
-the package names they take over from."""
+error codes, devices, upstream pins, the bridge unit, the project URLs,
+the package names they take over from and the install script."""
 
+import hashlib
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -239,3 +242,20 @@ def test_udev_attrs_match_one_device():
         for rule in path.read_text().replace("\\\n", " ").splitlines():
             keys = set(re.findall(r"\bATTRS\{(\w+)\}", rule))
             assert not (keys & device and keys & interface), f"{path.name}: {rule}"
+
+
+def test_install_script():
+    script = read("packaging/install.sh")
+    key = ROOT / "packaging/keys/hyperflux-next-repository-key.asc"
+    pinned = re.search(r"(?m)^KEY_SHA256=(\w+)$", script).group(1)
+    assert pinned == hashlib.sha256(key.read_bytes()).hexdigest(), "install.sh pins another key file"
+    assert f"SITE={makefile_var('SITE_URL')}\n" in script
+    conf = dict(re.findall(r"(?m)^(\w+)=(\S+)$", read("packaging/repository.conf")))
+    assert f'"${{VERSION_ID:-}}" = {conf["UBUNTU_RELEASE"]} ] && target=ubuntu' in script
+    assert f'{conf["DEBIAN_SUITE"]}:* | *:{conf["DEBIAN_RELEASE"]}) target=debian' in script
+    assert f'"${{VERSION_ID:-}}" = {conf["FEDORA_RELEASE"]} ] && target=fedora' in script
+    if shutil.which("gpg"):
+        listing = subprocess.run(["gpg", "--batch", "--with-colons", "--show-keys", key],
+                                 capture_output=True, text=True, check=True).stdout
+        primary = re.search(r"(?m)^fpr:+(\w{40}):", listing).group(1)
+        assert f"KEY_FPR={primary}\n" in script

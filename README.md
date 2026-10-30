@@ -45,15 +45,26 @@ HyperFlux Next V2 is built against OpenRazer 3.12.4.
 
 ## Install
 
-There's a guide for each supported distribution:
+There are packages for Arch Linux, Ubuntu 26.10, Debian 14, Fedora 44 and
+openSUSE Tumbleweed, all on x86_64. Plug the receiver in before you start.
 
-- Arch Linux (rolling): [Install on Arch](docs/user/install-arch.md)
-- Ubuntu 26.10 and Debian 14:
-  [Install on Ubuntu or Debian](docs/user/install-apt.md)
-- Fedora 44 and openSUSE Tumbleweed:
-  [Install on Fedora or openSUSE](docs/user/install-rpm.md)
+### The quick way
 
-Each one has the same four steps, on x86_64 with the receiver plugged in.
+```sh
+curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
+```
+
+The script does steps 1 to 3 from "By hand" for you. Your package manager
+shows what it's about to install and waits for a yes, and the script asks
+before it reboots. After the reboot, `hyperfluxctl doctor` should say
+`HyperFlux Next V2 is ready.`
+
+### By hand
+
+Each distribution has a guide with these steps in full:
+[Arch](docs/user/install-arch.md),
+[Ubuntu or Debian](docs/user/install-apt.md) and
+[Fedora or openSUSE](docs/user/install-rpm.md).
 
 1. Add the HyperFlux Next V2 package repository. You do this once. The
    project signs and runs it, not your distribution.

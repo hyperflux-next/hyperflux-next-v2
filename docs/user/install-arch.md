@@ -4,6 +4,18 @@ You need Arch Linux on x86_64, the HyperFlux receiver plugged in with
 your keyboard and mouse paired to it, and an account that can use `sudo`.
 Keep the receiver, keyboard and mouse connected the whole time.
 
+A script can do steps 1 to 3 for you. Paste it and answer pacman's
+questions as they come:
+
+```sh
+curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
+```
+
+It adds the headers for every kernel you have installed (`linux-headers`
+for `linux`, `linux-lts-headers` for `linux-lts`), and asks before it
+reboots. For Core, end the line with `sh -s -- --core` instead. Below is
+the same thing, one step at a time.
+
 ## 1. Add the repository
 
 This is a one-time step. The repository belongs to the HyperFlux Next V2

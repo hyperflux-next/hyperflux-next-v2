@@ -418,7 +418,10 @@ pub fn healthy(tree: &Tree, runner: &FakeRunner) {
 /// modules loaded, openrazer-daemon listing both devices, the keyboard's
 /// key-press link in place and the OpenRGB plugin installed.
 pub fn full(tree: &Tree, runner: &FakeRunner) {
-    let component = r#"{"component":"full","version":"1.0.0"}"#;
+    let component = format!(
+        r#"{{"component":"full","version":"{}"}}"#,
+        hfx_proto::PRODUCT_VERSION
+    );
     let key_link = "/dev/input/by-id/hyperflux-next-pci-0000_00_14_0-usb-0_3_1_1-\
                     DSV2Pro_TKL_000000000000-if01-event-mouse";
     tree.file("/usr/share/hyperflux-next/components/full.json", component)

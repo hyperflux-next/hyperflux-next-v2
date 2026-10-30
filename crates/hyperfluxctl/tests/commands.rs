@@ -677,7 +677,10 @@ fn usage_help_and_version() {
     );
     assert_eq!(
         run(&system, &["--version"]).out,
-        "hyperfluxctl (HyperFlux Next V2) 1.0.0\n"
+        format!(
+            "hyperfluxctl (HyperFlux Next V2) {}\n",
+            hfx_proto::PRODUCT_VERSION
+        )
     );
     let failure = run(&system, &["status", "--fix"]).code.unwrap_err();
     assert!(failure.usage);
