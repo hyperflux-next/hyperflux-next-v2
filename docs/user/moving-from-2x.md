@@ -29,8 +29,11 @@ points at the 2.x repository, and you need to swap the entry once.
      you have. Then run:
 
      ```sh
-     sudo rm -f /etc/pacman.d/hyperflux-next.conf
+     sudo rm -f /etc/pacman.d/hyperflux-next.conf /var/lib/pacman/sync/hyperflux-next.*
      ```
+
+     The second path is pacman's copy of the old package list. It's
+     signed with the old key, and the new repository has the same name.
 
      The old key is still trusted. `pacman-key --list-keys` shows its
      fingerprint. Remove it with:
