@@ -16,6 +16,7 @@ SITE=https://hyperflux-next.github.io/hyperflux-next-v2
 # refused. pacman is told to trust its primary key.
 KEY_SHA256=e9238836e50b4fea26457ea1a2c29bb38c2fb63202374d4a035d33b616f1cfca
 KEY_FPR=206874CADD1B64B32483E2A85FC5921DE97AF7AA
+MOVING=https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/moving-from-2x.md
 # The releases the site has packages for, as in packaging/repository.conf.
 UBUNTU_SUITE=stonking
 UBUNTU_RELEASE=26.10
@@ -52,14 +53,27 @@ pm() {
 }
 
 install_arch() {
+    # 2.x used the same repository name, so an existing entry may still
+    # point at its server. pacman-conf reads entries pulled in with Include
+    # as well, which a grep of pacman.conf would miss.
+    server=$(pacman-conf --repo hyperflux-next Server 2>/dev/null || true)
+    case $server in
+    "" | "$SITE/arch" | "$SITE/arch/") ;;
+    *) die "pacman still uses the 2.x repository at $server. Remove that entry as $MOVING shows, then run this again." ;;
+    esac
     say "Giving the key to pacman"
     as_root pacman-key --add "$tmp/key.asc" >/dev/null
     as_root pacman-key --lsign-key "$KEY_FPR" >/dev/null
-    if ! grep -q '^\[hyperflux-next\]' /etc/pacman.conf; then
+    if [ -z "$server" ]; then
         say "Adding the repository to /etc/pacman.conf"
         printf '\n[hyperflux-next]\nSigLevel = Required DatabaseRequired TrustedOnly\nServer = %s/arch\n' "$SITE" |
             as_root tee -a /etc/pacman.conf >/dev/null
     fi
+    # pacman keeps a repository's package list after its entry is removed,
+    # and one left by 2.x is signed with the old key. Fetch ours fresh.
+    sync=$(pacman-conf DBPath)sync
+    as_root rm -f "$sync/hyperflux-next.db" "$sync/hyperflux-next.db.sig" \
+        "$sync/hyperflux-next.files" "$sync/hyperflux-next.files.sig"
     pkgs=hyperflux-next-v2-linux
     if [ "$edition" = full ]; then
         pkgs=hyperflux-next-v2-full
@@ -116,10 +130,14 @@ install_dnf() {
 }
 
 install_zypper() {
+    uri=$(zypper -q lr hyperflux-next 2>/dev/null | sed -n 's/^URI *: *//p')
+    case $uri in
+    "" | "$SITE"/*) ;;
+    *) die "zypper still uses the 2.x repository at $uri. Remove it as $MOVING shows, then run this again." ;;
+    esac
     say "Adding the key and the repository"
     as_root rpm --import "$tmp/key.asc"
-    zypper -q lr hyperflux-next >/dev/null 2>&1 ||
-        as_root zypper -q addrepo "$SITE/opensuse/hyperflux-next.repo"
+    [ -n "$uri" ] || as_root zypper -q addrepo "$SITE/opensuse/hyperflux-next.repo"
     # shellcheck disable=SC2086
     pm zypper ${yes:+--non-interactive} refresh hyperflux-next
     pkgs=hyperflux-next-v2-linux
