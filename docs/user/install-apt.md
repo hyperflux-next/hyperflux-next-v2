@@ -14,6 +14,18 @@ You need x86_64, the HyperFlux receiver plugged in with your keyboard and
 mouse paired to it, and an account that can use `sudo`. Keep the
 receiver, keyboard and mouse connected the whole time.
 
+If you'd rather not type the steps below, this does 1 to 3 in one go:
+
+```sh
+curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
+```
+
+It takes `linux-headers-generic` on Ubuntu and `linux-headers-amd64` on
+Debian, and apt lists the packages and asks before installing them. The
+optional OpenRGB plugin for Ubuntu is left to you
+([the OpenRGB page](#the-openrgb-page)). For Core, end the line with
+`sh -s -- --core`.
+
 ## 1. Add the repository
 
 You do this once. The HyperFlux Next V2 project runs the repository, not
