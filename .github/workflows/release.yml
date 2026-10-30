@@ -76,5 +76,24 @@ jobs:
           # A release page resolves relative links against its own address,
           # so the CHANGELOG's links to files point at them in the tag.
           sed -E -i "s#\]\(([^)#:][^):]*)\)#]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/\1)#g" notes.md
+          # A release page keeps every newline as a line break, so each
+          # paragraph and list item of the wrapped CHANGELOG goes on one line.
+          python3 - notes.md <<'EOF'
+          import re, sys
+          out, fence = [], False
+          for line in open(sys.argv[1]).read().split("\n"):
+              s = line.strip()
+              if s.startswith("```"):
+                  fence = not fence
+                  out.append(line)
+                  continue
+              prev = out[-1].strip() if out else ""
+              starts = not s or s.startswith(("#", "|", ">")) or re.match(r"([-*+]|\d+\.)\s", s)
+              if fence or starts or not prev or prev.startswith(("```", "#", "|")):
+                  out.append(line)
+              else:
+                  out[-1] = out[-1].rstrip() + " " + s
+          open(sys.argv[1], "w").write("\n".join(out))
+          EOF
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
             --title "HyperFlux Next V2 $version" --notes-file notes.md
