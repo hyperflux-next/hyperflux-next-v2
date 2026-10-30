@@ -24,6 +24,7 @@ LINES = [
     ("sdk/python/pyproject.toml", r'(?m)^(version = ")[^"]*'),
     ("packaging/arch/PKGBUILD", r"(?m)^(pkgver=).*"),
     ("packaging/rpm/hyperflux-next-v2.spec", r"(?m)^(Version:\s+).*"),
+    ("man/hyperfluxctl.1", r'(?m)^(\.TH HYPERFLUXCTL 1 \S+ "HyperFlux Next V2 )[0-9.]+'),
 ]
 
 

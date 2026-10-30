@@ -5,7 +5,8 @@ Each section is also the release's notes on GitHub.
 ## 1.0.2
 
 `install.sh` now runs on distributions based on a supported release,
-which it used to refuse. In the packages, only one log message changed.
+which it used to refuse. In the packages, one log message changed, and
+the man page names the right version.
 
 ### Fixed
 
@@ -37,6 +38,8 @@ which it used to refuse. In the packages, only one log message changed.
   installing the release files now match the files' names.
 - When the other end of a socket runs as the wrong account, the bridge and
   the device keeper say so without printing user ids.
+- `man hyperfluxctl` said 1.0.0 in 1.0.1. `scripts/set-version` now
+  updates the man page too, and a test checks it.
 
 ### Signing key
 

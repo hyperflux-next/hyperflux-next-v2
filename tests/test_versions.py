@@ -21,6 +21,7 @@ LOCATIONS = [
     ("packaging/debian/changelog", r"\Ahyperflux-next-v2 \(([^-]+)-\d+\) ", True),
     ("packaging/rpm/hyperflux-next-v2.spec", r"(?m)^Version:\s+(\S+)$", True),
     ("CHANGELOG.md", r"(?m)^## (\S+)$", True),
+    ("man/hyperfluxctl.1", r'(?m)^\.TH HYPERFLUXCTL 1 \S+ "HyperFlux Next V2 ([0-9.]+)"', True),
 ]
 
 
