@@ -22,6 +22,7 @@ LOCATIONS = [
     ("packaging/rpm/hyperflux-next-v2.spec", r"(?m)^Version:\s+(\S+)$", True),
     ("CHANGELOG.md", r"(?m)^## (\S+)$", True),
     ("man/hyperfluxctl.1", r'(?m)^\.TH HYPERFLUXCTL 1 \S+ "HyperFlux Next V2 ([0-9.]+)"', True),
+    (".github/ISSUE_TEMPLATE/bug_report.yml", r"(?m)^\s+placeholder: Arch Linux, \S+ ([0-9.]+)-1$", True),
 ]
 
 
