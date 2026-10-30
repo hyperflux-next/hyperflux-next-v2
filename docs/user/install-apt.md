@@ -1,14 +1,16 @@
 # Install on Ubuntu or Debian
 
-This guide covers Ubuntu 26.10 (stonking) and Debian 14 (forky). On
-Debian, Full includes the OpenRGB plugin, for Debian's own OpenRGB 1.0.
-On Ubuntu the plugin is optional and works with OpenRGB 1.1 from
-openrgb.org: see [the OpenRGB page](#the-openrgb-page).
+This guide covers Ubuntu 26.10 (stonking), Debian 14 (forky) and
+distributions based on them. On Debian, Full includes the OpenRGB plugin,
+for Debian's own OpenRGB 1.0. On Ubuntu the plugin is optional and works
+with OpenRGB 1.1 from openrgb.org: see [the OpenRGB page](#the-openrgb-page).
 
 Older releases aren't supported. Ubuntu 26.04 LTS and Debian 13 package
 OpenRazer versions that lack some of the supported keyboards, and Debian
-13 has no OpenRGB. Debian 14 is still Debian's testing release, and its
-own packages change more often than in a stable release.
+13 doesn't package OpenRGB. Anything based on an Ubuntu LTS release, such
+as Linux Mint or Pop!_OS, isn't supported either. Debian 14 is still
+Debian's testing release, and its own packages change more often than in
+a stable release.
 
 You need x86_64, the HyperFlux receiver plugged in with your keyboard and
 mouse paired to it, and an account that can use `sudo`. Keep the

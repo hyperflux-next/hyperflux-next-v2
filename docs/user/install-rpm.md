@@ -6,6 +6,10 @@ distribution ships an OpenRGB that can load the HyperFlux Next V2 plugin
 (both package a 1.0 release candidate), but on Fedora, OpenRGB 1.1 from
 openrgb.org can, as [the OpenRGB page](#the-openrgb-page) shows.
 
+Distributions based on Fedora 44 or Tumbleweed can use the same packages.
+Image-based systems such as Bazzite or Silverblue can't install them,
+because their system is read-only.
+
 You need the HyperFlux receiver plugged in with your keyboard and mouse
 paired to it, and an account that can use `sudo`. Keep the receiver,
 keyboard and mouse connected the whole time.

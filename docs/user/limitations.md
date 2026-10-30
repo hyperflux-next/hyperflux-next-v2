@@ -13,8 +13,11 @@ about it.
 - Packages are built for x86_64 alone.
 - Ubuntu 26.04 LTS and Debian 13 aren't supported. Their OpenRazer
   versions (3.11.0 and 3.10.2) lack the BlackWidow V4 Tenkeyless
-  HyperSpeed. Debian 13's also lacks the V4 Mini HyperSpeed, and Debian 13
-  has no OpenRGB at all.
+  HyperSpeed. Debian 13's also lacks the V4 Mini HyperSpeed, and Debian
+  doesn't package OpenRGB for 13. Distributions based on an Ubuntu LTS
+  release, Linux Mint for one, are left out for the same reason.
+- Image-based systems such as Bazzite or SteamOS keep the system
+  read-only, and the packages can't be installed there.
 - Ubuntu supports 26.10 until July 2027. Debian 14 is still Debian's
   testing release and changes more often than a stable one.
 - HyperFlux Next V2 is not in any distribution's official repositories.

@@ -1,8 +1,9 @@
 # Install on Arch Linux
 
-You need Arch Linux on x86_64, the HyperFlux receiver plugged in with
-your keyboard and mouse paired to it, and an account that can use `sudo`.
-Keep the receiver, keyboard and mouse connected the whole time.
+This guide is for Arch Linux and distributions based on it, on x86_64.
+You need the HyperFlux receiver plugged in with your keyboard and mouse
+paired to it, and an account that can use `sudo`. Keep the receiver,
+keyboard and mouse connected the whole time.
 
 A script can do steps 1 to 3 for you. Paste it and answer pacman's
 questions as they come:

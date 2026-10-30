@@ -46,7 +46,8 @@ HyperFlux Next V2 is built against OpenRazer 3.12.4.
 ## Install
 
 There are packages for Arch Linux, Ubuntu 26.10, Debian 14, Fedora 44 and
-openSUSE Tumbleweed, all on x86_64. Plug the receiver in before you start.
+openSUSE Tumbleweed, all on x86_64. A distribution based on one of these
+releases can use the same packages. Plug the receiver in before you start.
 
 ### The quick way
 
