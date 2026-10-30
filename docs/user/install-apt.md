@@ -53,7 +53,7 @@ sudo curl --proto '=https' --tlsv1.2 -fL -o /etc/apt/sources.list.d/hyperflux-ne
   https://hyperflux-next.github.io/hyperflux-next-v2/ubuntu/hyperflux-next.sources
 ```
 
-Ubuntu's file has six lines:
+Ubuntu's file looks like this:
 
 ```text
 Types: deb

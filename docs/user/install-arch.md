@@ -133,8 +133,8 @@ hidraw driver.
 - `hyperflux-next-v2-full`: the OpenRazer rules and module list (Full)
 
 HyperFlux Next V2 doesn't install or replace `openrazer-daemon`,
-Polychromatic or OpenRGB. Full needs the other three packages at exactly
-its own version, so pacman updates them together.
+Polychromatic or OpenRGB. Full needs the other packages at exactly its own
+version, so pacman updates them together.
 
 ## Without the repository
 

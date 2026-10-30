@@ -54,7 +54,7 @@ says where it comes from. "OpenRGB 1.1" means the plugin for OpenRGB 1.1
 and not Debian's, which is for 1.0.
 
 `hyperfluxctl`, the battery widget and the apps use the upstream names.
-Four of them differ from the table: Naga Pro V3, Blackwidow V4 Low
+These differ from the table: Naga Pro V3, Blackwidow V4 Low
 Profile TKL, BlackWidow V4 Mini Hyperspeed and BlackWidow V4 Low-profile
 HyperSpeed.
 

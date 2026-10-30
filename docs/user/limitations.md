@@ -165,5 +165,5 @@ To turn the links back on, remove that file and reboot.
   therefore means the device gave no answer or could not be asked,
   because it is off, asleep or out of range, or cannot report its level.
   The widget keeps the last reading, and `hyperfluxctl` and the OpenRGB
-  page show its age. The 30 minutes are based on how often the two tested
+  page show its age. The 30 minutes are based on how often the tested
   devices report.

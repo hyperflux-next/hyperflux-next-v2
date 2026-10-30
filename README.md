@@ -10,10 +10,10 @@ Not affiliated with or endorsed by Razer.
 
 ## Devices
 
-I test with two devices on the receiver: the Razer Basilisk V3 Pro 35K
-and the Razer DeathStalker V2 Pro TKL.
+I test with the Razer Basilisk V3 Pro 35K and the Razer DeathStalker V2 Pro
+TKL on the receiver.
 
-Ten more are checked:
+These are checked:
 
 - Naga V2 Pro
 - Naga V3 Pro, in OpenRGB 1.1 only
