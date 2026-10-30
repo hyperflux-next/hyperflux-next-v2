@@ -138,7 +138,9 @@ mod tests {
         assert_eq!(a.sim, Some(PathBuf::from("/tmp/s")));
         assert_eq!(a.socket, Some(PathBuf::from("/tmp/b")));
         assert!(a.read_only && !a.no_openrazer);
-        assert!(matches!(args(&["--version"]), Ok(Parsed::Print(v)) if v == "1.0.0"));
+        assert!(
+            matches!(args(&["--version"]), Ok(Parsed::Print(v)) if v == hfx_proto::PRODUCT_VERSION)
+        );
         assert!(matches!(args(&["--help"]), Ok(Parsed::Print(h)) if h.starts_with("Usage:")));
         assert!(args(&["--socket"]).is_err());
         assert!(args(&["--sim", "a", "--sim", "b"]).is_err());
