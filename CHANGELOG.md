@@ -2,6 +2,32 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.1
+
+Nothing in the packages changed. This release adds a way to install them
+with one line.
+
+### Added
+
+- `install.sh` on the package site, which runs steps 1 to 3 of the install
+  guide for your distribution:
+
+  ```sh
+  curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
+  ```
+
+  The key it downloads has to match the hash written in the script, or it
+  stops before changing anything. Your package manager still lists what
+  it will install and asks first. For Core, end the line with
+  `sh -s -- --core`.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.0
 
 HyperFlux Next V2 starts its own version numbers, error codes and client

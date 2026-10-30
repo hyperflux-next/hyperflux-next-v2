@@ -11,7 +11,7 @@
 # does all of this.
 
 cmake_minimum_required(VERSION 3.20)
-project(hyperflux-next-openrgb VERSION 1.0.0 LANGUAGES CXX)
+project(hyperflux-next-openrgb VERSION 1.0.1 LANGUAGES CXX)
 
 set(OPENRGB_QT 6 CACHE STRING "Qt major version of the OpenRGB to build for (6 or 5)")
 set(OPENRGB_SOURCE "" CACHE PATH "OpenRGB tree prepared by fetch.sh for that version")
