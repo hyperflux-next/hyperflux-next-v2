@@ -24,6 +24,32 @@ Description: HyperFlux Next V2 Core plus OpenRazer support for the paired device
  the paired devices to OpenRazer apps such as Polychromatic. On Debian it
  also brings the OpenRGB plugin, which Debian's own OpenRGB loads.
 
+Package: hyperflux-next-v2-full
+Architecture: all
+Version: 1.0.1-1
+Priority: optional
+Section: misc
+Source: hyperflux-next-v2
+Maintainer: offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>
+Installed-Size: 25
+Provides: hyperflux-next-full (= 1.0.1-1)
+Depends: hyperflux-next-v2-linux (= 1.0.1-1), hyperflux-next-v2-openrazer-driver-dkms (= 1.0.1-1)
+Recommends: hyperflux-next-v2-openrgb-plugin (= 1.0.1-1)
+Suggests: openrazer-daemon, python3-openrazer
+Conflicts: hyperflux-next-full
+Replaces: hyperflux-next-full
+Filename: pool/main/h/hyperflux-next-v2/hyperflux-next-v2-full_1.0.1-1_all.deb
+Size: 4642
+MD5sum: 71a5356a4bef25ed16383b0c9a81b80d
+SHA1: 480e1834d9505c8c139fc339644ad07f683624da
+SHA256: 40cb172c09a23ee132cfaebec9a2fd8c3d2f1bd17a0a5b0e2b8051a0c90c21ce
+SHA512: 36a9c5551bdc3f981a242d0d2529c4eee9a138f4c524733c16ae1dceca648c2c8a7e475f66a9ff922a6e2c6e76c032e303658d10d2770de1d59a699a86baf4b0
+Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
+Description: HyperFlux Next V2 Core plus OpenRazer support for the paired devices
+ The udev rules and module list that let the HyperFlux Next V2 bridge offer
+ the paired devices to OpenRazer apps such as Polychromatic. On Debian it
+ also brings the OpenRGB plugin, which Debian's own OpenRGB loads.
+
 Package: hyperflux-next-v2-linux
 Architecture: amd64
 Version: 1.0.0-1
@@ -42,6 +68,37 @@ MD5sum: 87e5acbfba67fa878d36d45933fcf9f0
 SHA1: f1640b0f88bd79911a4ddf106c0553105603f415
 SHA256: ac7202c389644ba6b6edea2918ae9c6b943e654e83818fad1a797322778256a6
 SHA512: 941adf0fcb6db5c26228aa3de62839c4932b1272aa1b68a66b5f5f29c895b012840906d37c71b9fcd8b87b6f958f4da3c47e5a518a50f04232656ad54f09a1ae
+Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
+Description: HyperFlux Next V2 bridge, CLI and base services
+ The HyperFlux Next V2 bridge and device keeper services, the hyperfluxctl
+ command, and the system users, sockets and udev rules they need. The
+ bridge reaches the Razer HyperFlux V2 receiver (USB 1532:00cf) through
+ hidraw, and the batteries of the devices paired to it show up in the
+ desktop's battery widget. It takes over from the hyperflux-next-linux
+ package and the receiver kernel modules of earlier releases.
+ .
+ This is the Core edition. Install hyperflux-next-v2-full to use the
+ devices in OpenRazer apps, and hyperflux-next-v2-openrgb-plugin for
+ OpenRGB.
+
+Package: hyperflux-next-v2-linux
+Architecture: amd64
+Version: 1.0.1-1
+Priority: optional
+Section: misc
+Source: hyperflux-next-v2
+Maintainer: offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>
+Installed-Size: 2541
+Provides: hyperflux-next-dkms (= 1.0.1-1), hyperflux-next-linux (= 1.0.1-1)
+Depends: systemd, udev, libc6 (>= 2.39), libgcc-s1 (>= 4.2)
+Conflicts: hyperflux-next-dkms, hyperflux-next-linux, hyperflux-v2-linux-dkms
+Replaces: hyperflux-next-dkms, hyperflux-next-linux, hyperflux-v2-linux-dkms
+Filename: pool/main/h/hyperflux-next-v2/hyperflux-next-v2-linux_1.0.1-1_amd64.deb
+Size: 789384
+MD5sum: 49d0bd1735e82dd7fdf3b0f74656d31d
+SHA1: 332412717878963b720a668b7244d4b10eb388dc
+SHA256: 1309a2106fe875843fb9381c09773f3187b8c363ce67fa0c425da20306792f38
+SHA512: 1b6d94684947b4e38142d3581d522b4bb66382e15e4e0c671f9dc26d2bf4a17c3626f4b3ea6c083adfea952227d4cd844106a07601d3c6ab384d86d85fa6c776
 Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
 Description: HyperFlux Next V2 bridge, CLI and base services
  The HyperFlux Next V2 bridge and device keeper services, the hyperfluxctl
@@ -80,6 +137,31 @@ Description: OpenRazer driver sources with the HyperFlux Next V2 transport, for 
  distribution's openrazer-driver-dkms, so the stock openrazer-daemon
  installs on top of it.
 
+Package: hyperflux-next-v2-openrazer-driver-dkms
+Architecture: all
+Version: 1.0.1-1
+Priority: optional
+Section: misc
+Source: hyperflux-next-v2
+Maintainer: offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>
+Installed-Size: 999
+Provides: hyperflux-next-openrazer-driver-dkms (= 1.0.1-1), hyperflux-openrazer-driver-abi (= 3.12.4), openrazer-driver-dkms (= 3.12.4+dfsg-1), openrazer-kernel-modules-dkms
+Depends: dkms, systemd, udev
+Conflicts: hyperflux-next-openrazer-driver-dkms, openrazer-driver-dkms, openrazer-kernel-modules-dkms
+Replaces: hyperflux-next-openrazer-driver-dkms, openrazer-driver-dkms, openrazer-kernel-modules-dkms
+Filename: pool/main/h/hyperflux-next-v2/hyperflux-next-v2-openrazer-driver-dkms_1.0.1-1_all.deb
+Size: 75134
+MD5sum: 0858b1c304bd0260e18fdb25ba22ba88
+SHA1: 607ac70117625d3a7157b4fdf32ea5df4486b3da
+SHA256: 9d4b843906874c7b847be50c1c72adb8f0f123b4a48a86cdba6de03b938c6628
+SHA512: 29b3ca02e5768f88a2c548b86d9854f803b9d75db3364bccd62ed4ee24913dc37d5634bef20c3368c46bf2175a04656babcc3b4a5c8d1cb101f91532e33a791b
+Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
+Description: OpenRazer driver sources with the HyperFlux Next V2 transport, for DKMS
+ OpenRazer 3.12.4's kernel drivers with the patches that let them drive
+ the devices HyperFlux Next V2 offers. It takes the place of the
+ distribution's openrazer-driver-dkms, so the stock openrazer-daemon
+ installs on top of it.
+
 Package: hyperflux-next-v2-openrgb-plugin
 Architecture: amd64
 Version: 1.0.0-1
@@ -97,6 +179,32 @@ MD5sum: 0eb690dc8abf55db0c2613d7368e5ab3
 SHA1: 7c040dad1926112c2acefd2b0b23a6e076842f1f
 SHA256: 0e6c73a9cf2137223108e7153efcea9f180caa0a98268b821348d3de3be768af
 SHA512: a1be3e0fe9abfce9d8a94aa2f4d0228e7bf0e41524feac7b886aa3c28fb8f3470a2581781a8149371ff14f84cd517b89f2874c722376509510d7039c1e54c6f7
+Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
+Description: HyperFlux Next V2 plugin for OpenRGB
+ Shows the Razer devices paired with a HyperFlux V2 receiver in OpenRGB,
+ and adds a page with their batteries to OpenRGB's Information tab.
+ .
+ The Debian package is built for Debian's own OpenRGB 1.0. The Ubuntu
+ package is built for OpenRGB 1.1 from openrgb.org and depends on it,
+ because Ubuntu's own OpenRGB is too old to load the plugin.
+
+Package: hyperflux-next-v2-openrgb-plugin
+Architecture: amd64
+Version: 1.0.1-1
+Priority: optional
+Section: misc
+Source: hyperflux-next-v2
+Maintainer: offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com>
+Installed-Size: 838
+Depends: hyperflux-next-v2-linux (= 1.0.1-1), openrgb (>= 1.1), openrgb (<< 1.2~), libc6 (>= 2.38), libgcc-s1 (>= 3.3.1), libqt6core6t64 (>= 6.11.2), libqt6gui6 (>= 6.11.2), libqt6widgets6 (>= 6.1.2), libstdc++6 (>= 14)
+Replaces: hyperflux-next-full (<< 1:1.0.1~)
+Enhances: openrgb
+Filename: pool/main/h/hyperflux-next-v2/hyperflux-next-v2-openrgb-plugin_1.0.1-1_amd64.deb
+Size: 279420
+MD5sum: 207c4d466bdbdbf41e7817acd1b018c4
+SHA1: 2b5fd4de30e01437ae7913ec17db820880ba31f8
+SHA256: 45407bd8dd722908616888c1fd900dee5a4227ecb0ec933abf4214fc65598e69
+SHA512: f6f0210714249fde4d6328618a9720379b38120863e675a90c6a3a4e164af1983a2ef801bbfee4873e55f1b275470405cbe1c12c4742da73ef6ab35ba551353b
 Homepage: https://github.com/hyperflux-next/hyperflux-next-v2
 Description: HyperFlux Next V2 plugin for OpenRGB
  Shows the Razer devices paired with a HyperFlux V2 receiver in OpenRGB,
