@@ -1,5 +1,3 @@
-name: Device report
-description: A device that isn't listed, or a listed device that works or doesn't.
 labels: ["device"]
 body:
   - type: markdown
@@ -7,7 +5,9 @@ body:
       value: >-
         Devices marked "not yet tested through the receiver" are the ones where a report helps most. A
         `hyperfluxctl report` file and the checklist below are what it takes to move a device from checked to
-        tested, one feature at a time. Opening a report doesn't mean the device will be supported.
+        tested, one feature at a time. Posting a report doesn't mean the device will be supported. If something
+        is broken, a [bug report](https://github.com/hyperflux-next/hyperflux-next-v2/issues/new?template=bug_report.yml)
+        is the better place.
   - type: input
     id: model
     attributes:
