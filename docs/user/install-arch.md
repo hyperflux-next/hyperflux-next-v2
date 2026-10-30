@@ -1,6 +1,8 @@
 # Install on Arch Linux
 
 This guide is for Arch Linux and distributions based on it, on x86_64.
+Artix doesn't run systemd and SteamOS keeps `/usr` read-only, so neither
+can use it.
 You need the HyperFlux receiver plugged in with your keyboard and mouse
 paired to it, and an account that can use `sudo`. Keep the receiver,
 keyboard and mouse connected the whole time.
@@ -12,16 +14,16 @@ questions as they come:
 curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
 ```
 
-It adds the headers for every kernel you have installed (`linux-headers`
-for `linux`, `linux-lts-headers` for `linux-lts`), and asks before it
-reboots. For Core, end the line with `sh -s -- --core` instead. Below is
-the same thing, one step at a time.
+It adds the headers for each installed kernel that has a headers package
+in your repositories, and asks before it reboots. A kernel built from the
+AUR needs its headers installed by hand. For Core, end the line with
+`sh -s -- --core` instead. Below is the same thing, one step at a time.
 
 ## 1. Add the repository
 
-This is a one-time step. The repository belongs to the HyperFlux Next V2
-project, not to Arch Linux. The packages and the package list are signed
-with the project signing key.
+This is a one-time step. It's the HyperFlux Next V2 project's own
+repository, and the packages and the package list are signed with the
+project signing key.
 
 Download the key and look at its fingerprints:
 
@@ -59,9 +61,11 @@ just the bridge, its device keeper and `hyperfluxctl`. With Core alone,
 batteries show on the desktop but lighting apps can't reach the devices.
 If in doubt, take Full.
 
-Full builds OpenRazer's kernel drivers with DKMS. DKMS needs the headers
-of every kernel you boot: `linux-headers` for `linux`, `linux-lts-headers`
-for `linux-lts`, and so on. Core needs no kernel headers.
+Full builds OpenRazer's kernel drivers with DKMS, which needs the headers
+of every kernel you boot. A kernel's headers package is its name with
+`-headers` added (`linux-lts-headers` for `linux-lts`), and
+`cat /usr/lib/modules/*/pkgbase` lists the kernels you have. Core needs no
+kernel headers. For Arch's default kernel:
 
 ```sh
 sudo pacman -Syu linux-headers hyperflux-next-v2-full
@@ -76,8 +80,8 @@ stock `openrazer-daemon` works with it.
 
 ## 3. Enable and reboot
 
-The packages start nothing by themselves. Enable the bridge and your
-desktop's socket for it, then reboot:
+The packages start nothing by themselves. Enable the bridge and your own
+socket, then reboot:
 
 ```sh
 sudo systemctl enable hyperflux-next-bridge.service "hyperflux-next-client@$(id -u).socket"

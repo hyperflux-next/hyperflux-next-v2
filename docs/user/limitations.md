@@ -8,16 +8,20 @@ about it.
 - I test releases on real hardware on Arch Linux. The Ubuntu, Debian,
   Fedora and openSUSE packages are built, installed and removed again in
   each distribution's container for every change. They are not tested on
-  real hardware. If something fails there, run `hyperfluxctl doctor` and
-  [report it](../../SUPPORT.md).
+  real hardware, and distributions based on any of the five aren't part of
+  the container test. If something fails there, run `hyperfluxctl doctor`
+  and [report it](../../SUPPORT.md).
 - Packages are built for x86_64 alone.
 - Ubuntu 26.04 LTS and Debian 13 aren't supported. Their OpenRazer
   versions (3.11.0 and 3.10.2) lack the BlackWidow V4 Tenkeyless
   HyperSpeed. Debian 13's also lacks the V4 Mini HyperSpeed, and Debian
   doesn't package OpenRGB for 13. Distributions based on an Ubuntu LTS
-  release, Linux Mint for one, are left out for the same reason.
-- Image-based systems such as Bazzite or SteamOS keep the system
+  release, such as Linux Mint, aren't supported either: their OpenRazer is
+  just as old, or older.
+- On image-based distributions such as Bazzite or SteamOS, `/usr` is
   read-only, and the packages can't be installed there.
+- The bridge is a systemd service, so distributions that boot another
+  init, such as Artix or Devuan, aren't supported.
 - Ubuntu supports 26.10 until July 2027. Debian 14 is still Debian's
   testing release and changes more often than a stable one.
 - HyperFlux Next V2 is not in any distribution's official repositories.
@@ -130,8 +134,8 @@ To turn the links back on, remove that file and reboot.
 - Charging is tested on the Basilisk V3 Pro 35K and the DeathStalker V2
   Pro TKL. The checked devices are asked the same question OpenRazer
   asks, but not tested through the receiver. That includes the Naga V3
-  Pro and the BlackWidow V4 Low-Profile TKL HyperSpeed. Our pinned
-  OpenRazer and OpenRGB don't ask those two, though owners' captures show
+  Pro and the BlackWidow V4 Low-Profile TKL HyperSpeed. OpenRazer 3.12.4
+  and OpenRGB 1.1 don't ask those two, though owners' captures show
   both answering on their own dongles
   ([hardware](hardware.md#the-checked-devices)).
 - If the bridge cannot learn whether a device is charging, the desktop's
@@ -139,7 +143,7 @@ To turn the links back on, remove that file and reboot.
   a battery has a level, the kernel has no "unknown" state for it.
   `hyperfluxctl` and the OpenRGB page say `charging not reported`
   instead.
-- The Basilisk V3 Pro 35K reports charging on its dock or cable. It keeps
+- The Basilisk V3 Pro 35K reports charging on its mat or cable. It keeps
   reporting it while it holds at a charge limit set elsewhere. The
   DeathStalker V2 Pro TKL reports charging on 2.4 GHz with its cable in.
   With its switch off and the cable in, it becomes a wired keyboard
@@ -149,11 +153,11 @@ To turn the links back on, remove that file and reboot.
 - The receiver gives no sign when a mouse goes on or off its mat. The
   bridge asks the mouse instead: when you pick it up and move it (at the
   first short pause, a second or more later), and 3 s and 18 s after you
-  put it down. Those times come from the simulator, not from a real
-  receiver. A change that leaves the pointer still shows within a minute.
-- A checked keyboard's cable shows at its next battery question, up to
-  ten minutes later. With Full it shows within seconds, when OpenRazer
-  finds the keyboard on its cable.
+  put it down. Those times were measured in the simulator. A change that
+  leaves the pointer still shows within a minute.
+- When a checked keyboard goes on its cable, charging shows at its next
+  battery question, up to ten minutes later. With Full it shows within
+  seconds, when OpenRazer finds the keyboard on its cable.
 - UPower calls a device battery at 100 % full even while it discharges.
   The widget shows discharging again from 99 %.
 - A reading turns stale after 30 minutes. The bridge asks a device that

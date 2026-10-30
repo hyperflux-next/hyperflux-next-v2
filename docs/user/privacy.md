@@ -16,14 +16,13 @@ own, `hyperflux-keeper`. Of the two services, it is the one that reads
 the receiver's input:
 
 - Interface 1 carries the receiver keyboard's key reports, with the
-  receiver's vendor reports among them. The keeper passes each vendor
-  report to the bridge as its first 16 bytes and its length. These are
-  identity and status reports, which the bridge turns into presence and
-  battery readings, plus two other kinds that the bridge just records for
-  `capture`. A key report becomes an activity event and nothing more:
-  the receiver, the lane and the time. There is at most one such event
-  every 250 ms, however fast you type. Anything else on interface 1 is
-  dropped.
+  receiver's vendor reports among them. The keeper passes each vendor report
+  to the bridge as its first 16 bytes and its length. These are identity and
+  status reports, which the bridge turns into presence and battery readings,
+  plus two other kinds (0x04 and 0x08) that the bridge only records for
+  `capture`. A key report becomes an activity event and nothing more: the
+  receiver, the lane and the time. There is at most one such event every 250
+  ms, however fast you type. Anything else on interface 1 is dropped.
 - Interface 0 carries the mouse's movement. The keeper empties it in
   batches. It sends the same kind of activity event, at most one every
   250 ms, without the movement.
@@ -59,8 +58,8 @@ and at no other time.
 With Full, OpenRazer's lighting also reaches the devices through the
 keeper and the bridge. For Ripple and other effects that light the keys
 you press, that lighting follows your typing, and the bridge passes it on
-and keeps none of it. `capture` records answers to queries, never
-writes.
+and keeps none of it. `capture` records the answers to queries, and none
+of the commands that change a device.
 
 Neither service can open a network connection. Both units allow Unix and
 netlink sockets and nothing else

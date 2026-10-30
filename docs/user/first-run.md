@@ -29,10 +29,8 @@ Below those, each paired device gets a line with its presence (`online`,
 `asleep`, `not reachable` or `waiting for activity`) and its battery.
 
 A device marked `(not yet tested through the receiver)` is one of the
-checked devices. It should work, but it isn't among the tested ones
-([hardware](hardware.md) explains the difference). If you have one, a
-short [device report](hardware.md#reporting-a-device) will help the next
-person.
+checked devices ([hardware](hardware.md) explains the term). If you have
+one, please send a short [device report](hardware.md#reporting-a-device).
 
 The last line, `Next`, tells you what to do, if anything.
 
@@ -59,8 +57,9 @@ Try the apps one at a time. That way a problem points at one of them.
    names. Apply an effect, check that the device changes, then close
    Polychromatic.
 2. Open OpenRGB, if you have the plugin. Full brings it on Arch and
-   Debian. On Ubuntu and Fedora it is a separate package for OpenRGB 1.1
-   from openrgb.org. Change a colour and check that the device follows.
+   Debian, and
+   [which OpenRGB loads the plugin](limitations.md#which-openrgb-loads-the-plugin)
+   covers the others. Change a colour and check that the device follows.
 
 OpenRGB also gets a HyperFlux Next V2 page under its Information tab,
 with one card per paired device. A card shows the battery, how the device
@@ -80,8 +79,8 @@ Pro 35K. There is nothing to set up.
 The bridge asks the devices for their levels when it starts and after
 resume, and the battery usually shows up within seconds. A device that has
 gone ten minutes without reporting its level is asked again. One that's
-switched off keeps its last reading, and `hyperfluxctl battery` shows how
-old it is.
+switched off keeps its last reading, and after 30 minutes
+`hyperfluxctl battery` shows how old it is.
 
 If the bridge has no way to learn whether a device is charging, the
 widget shows it as discharging, even on its cable, while
@@ -103,7 +102,8 @@ with these fields:
 The answer comes from what the bridge already knows. It does not ask the
 devices.
 
-For Waybar, add this to `config.jsonc`:
+For Waybar, add this to `config.jsonc`, and put `"custom/hyperflux"` in
+one of the `modules-*` lists:
 
 ```jsonc
 "custom/hyperflux": {
@@ -120,7 +120,8 @@ and, for example, this to `style.css`:
 #custom-hyperflux.critical { color: #e06c75; }
 ```
 
-For Polybar, with `jq` installed:
+For Polybar, with `jq` installed, add this module and put `hyperflux` in
+your bar's `modules-right`:
 
 ```ini
 [module/hyperflux]
