@@ -27,7 +27,7 @@ serde_json = { version = "=1.0.154", features = ["raw_value"] }
 
 # Safe syscalls: epoll, netlink, clock_gettime(CLOCK_BOOTTIME), SO_PEERCRED,
 # uid/pid, flock, stat.
-rustix = { version = "=1.1.5", features = ["event", "fs", "net", "process", "time", "std"] }
+rustix = { version = "=1.1.6", features = ["event", "fs", "net", "process", "time", "std"] }
 
 # ioctl(2) on the receiver's hidraw nodes. Only hfx-bridge uses it.
 libc = "=0.2.191"
