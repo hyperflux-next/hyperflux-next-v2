@@ -363,6 +363,46 @@ the reason. When the log keeps saying the bridge closed the connection,
 the keeper runs as a different user than the bridge expects. Reinstall
 `hyperflux-next-v2-linux` to fix that.
 
+### HFX-209
+
+SELinux runs the bridge or the device keeper as `init_t`, which is
+systemd's own domain, and `init_t` may not open the receiver or
+`/dev/uhid`. Typing and pointing still work, but nothing else does.
+systemd runs a service unconfined only when its program is labelled
+`bin_t`. On Fedora and openSUSE the packages install both programs in
+`/usr/libexec/hyperflux-next`, which has that label, so a label lost on
+the way (a restored backup, a file copied by hand) is the usual cause.
+
+Check the labels. If they aren't `bin_t`, restore them and restart both
+services:
+
+```sh
+ls -Z /usr/libexec/hyperflux-next
+sudo restorecon -Rv /usr/libexec/hyperflux-next
+sudo systemctl restart hyperflux-next-bridge.service hyperflux-next-keeper.service
+```
+
+### HFX-210
+
+systemd says the bridge is running, but Doctor's question got no answer.
+Doctor asks through your own socket, and a small proxy passes the
+question on to the bridge, so either of them can be stuck. Restart the
+bridge first:
+
+```sh
+sudo systemctl restart hyperflux-next-bridge.service
+```
+
+`hyperfluxctl doctor --fix` offers to run it. If Doctor still reports
+HFX-210, the proxy's log says whether it reached the bridge:
+
+```sh
+journalctl -b -u "hyperflux-next-client@$(id -u).service"
+```
+
+Keep that output, with a [support bundle](#asking-for-help), for a bug
+report.
+
 ### HFX-303
 
 A receiver driver from 2.x or a pre-release is still around, and it can
@@ -511,6 +551,15 @@ can't. At boot Core loads the
 `uhid` module, and Core's udev rules give `/dev/uhid` to the keeper's
 group, `hyperflux-keeper`. A reboot applies both. If the finding is still
 there after it, reinstall `hyperflux-next-v2-linux`.
+
+If Doctor says the running kernel has no `uhid` module, rebooting won't
+change that. Cloud images often boot a trimmed kernel without it (Debian's
+cloud kernel, or `kernel-default-base` on openSUSE). Install the standard
+kernel, `linux-image-amd64` on Debian or `kernel-default` on openSUSE, and
+boot into it.
+
+When Doctor says the keeper can't open it although the group and mode are
+right, something else refuses it, usually SELinux ([HFX-209](#hfx-209)).
 
 ### HFX-409
 

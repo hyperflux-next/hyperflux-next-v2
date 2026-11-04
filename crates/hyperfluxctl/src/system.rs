@@ -5,10 +5,12 @@
 //! [`Runner`]. That lets tests use a fixture tree and canned command output
 //! instead of the real system.
 
+use std::env;
+use std::ffi::OsStr;
 use std::fs;
 use std::io::Read;
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -16,6 +18,7 @@ use std::time::{Duration, Instant};
 /// Probes should answer quickly. A hung `busctl` mustn't hang Doctor.
 pub const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_BYTES: u64 = 64 * 1024;
+const SBIN: [&str; 2] = ["/usr/sbin", "/sbin"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Output {
@@ -40,6 +43,7 @@ pub struct RealRunner;
 impl Runner for RealRunner {
     fn output(&self, argv: &[&str], timeout: Duration) -> Option<Output> {
         let (program, args) = argv.split_first()?;
+        let program = locate(program, env::var_os("PATH").as_deref(), &SBIN);
         let mut child = Command::new(program)
             .args(args)
             .env("LC_ALL", "C")
@@ -83,6 +87,21 @@ impl Runner for RealRunner {
             .status()
             .is_ok_and(|s| s.success())
     }
+}
+
+/// `program` as given when PATH has it, else from the first of `sbin` that
+/// does. Debian and openSUSE keep /usr/sbin off a user's PATH, and
+/// `modinfo` lives there.
+fn locate(program: &str, path: Option<&OsStr>, sbin: &[&str]) -> PathBuf {
+    let has = |dir: &Path| dir.join(program).is_file();
+    let on_path = path.is_some_and(|p| env::split_paths(p).any(|dir| has(&dir)));
+    if program.contains('/') || on_path {
+        return program.into();
+    }
+    sbin.iter()
+        .map(Path::new)
+        .find(|dir| has(dir))
+        .map_or_else(|| program.into(), |dir| dir.join(program))
 }
 
 pub struct System {
@@ -322,6 +341,20 @@ mod tests {
             shell_words(&argv),
             r"sudo rm '/dev/input/by-id/a b' 'it'\''s'"
         );
+    }
+
+    #[test]
+    fn sbin_fallback() {
+        let dir = tempfile::tempdir().unwrap();
+        let (bin, sbin) = (dir.path().join("bin"), dir.path().join("sbin"));
+        for (dir, program) in [(&bin, "getent"), (&sbin, "modinfo")] {
+            fs::create_dir(dir).unwrap();
+            fs::write(dir.join(program), "").unwrap();
+        }
+        let find = |program| locate(program, Some(bin.as_os_str()), &[sbin.to_str().unwrap()]);
+        assert_eq!(find("getent"), PathBuf::from("getent"));
+        assert_eq!(find("modinfo"), sbin.join("modinfo"));
+        assert_eq!(find("mokutil"), PathBuf::from("mokutil"));
     }
 
     #[test]
