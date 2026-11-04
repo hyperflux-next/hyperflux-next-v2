@@ -1,20 +1,20 @@
 Architectures: amd64
 Codename: stonking
 Components: main
-Date: Fri, 30 Oct 2026 17:43:37 +0000
+Date: Wed, 04 Nov 2026 21:04:28 +0000
 Description: HyperFlux Next V2 packages for Ubuntu
 Label: HyperFlux Next V2
 Origin: HyperFlux Next V2
 Suite: stonking
 MD5Sum:
- 1c81de64855c5771102bbf5ddb273211            11458 main/binary-amd64/Packages
- 7607ce292ced7aa8b0d9869d1a2394d5             2889 main/binary-amd64/Packages.gz
+ 44ce45f7467d1ebab8fc3107e0aca476            11458 main/binary-amd64/Packages
+ 19708c6f93c8dbcf350db5f4594a1d3e             2897 main/binary-amd64/Packages.gz
 SHA1:
- b9dbe330d5291987c25971709d2dfe06aa350e11            11458 main/binary-amd64/Packages
- d4acf6fe444d3f4536cae5f84cf2f6b799ab8e7e             2889 main/binary-amd64/Packages.gz
+ a82d60e5f5d414389056446085de0937d7155332            11458 main/binary-amd64/Packages
+ 131b25b63d927b7c708a1aabd5128c9e6715e037             2897 main/binary-amd64/Packages.gz
 SHA256:
- 61367940361f533d9270450cab24224fcfdaeae7da3d97a8dcfd96342c86e7ce            11458 main/binary-amd64/Packages
- 625896f5bd936ea7ad861d10a6df1af93ecc35cf1fadbec4462dc075210b0d58             2889 main/binary-amd64/Packages.gz
+ 0e14c9115bb0910dc1446e2e9dc6f42a460838b5671bc1989a24a845b7c45dda            11458 main/binary-amd64/Packages
+ 5795746913d5afd61a61148d2084405cb44a9643d94dec8b0dcde731ac1e83fd             2897 main/binary-amd64/Packages.gz
 SHA512:
- a711edf7ad6422358ae58f6e7ef3f9ef6bd0f44ce83a95d5d110a0194fb04f0052dc3bcc9fb83351cc2fcca50791bc848a7c1f05fbbc2d3ef852e2c588a69b8b            11458 main/binary-amd64/Packages
- c5936c78fdba988e2ad7908974e7bb9d9a4d90c26693e262008d9339a88da3bcf75dfd390c5d24b54b1d467ae64f7e05a8bc5a775b7d1db98e81a24fc54266be             2889 main/binary-amd64/Packages.gz
+ dc259157eef18e5949a151ef6ce11741b109c04ca422dbaf7615d0df1a1552879592519c9ef0d76afbe8226708768e432b2938d8e194e8acc7a281df66d4c2c4            11458 main/binary-amd64/Packages
+ 69ef858db0b0a30905e340d5fbbb183c287a13ca99019c6f14bc787e003b69350c47aa233cda374ff2f3a509b093cd88dcd03aff30a5e164106d68d764673b11             2897 main/binary-amd64/Packages.gz
