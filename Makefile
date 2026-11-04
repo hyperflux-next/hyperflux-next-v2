@@ -13,6 +13,11 @@ DESTDIR ?=
 PREFIX ?= /usr
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib
+# The bridge, the device keeper and the per-user proxy. Fedora and
+# openSUSE set /usr/libexec/hyperflux-next: SELinux labels programs there
+# bin_t, and systemd runs a service unconfined only from a bin_t program.
+# Under /usr/lib they are lib_t and run as init_t, which can't open the
+# receiver or /dev/uhid.
 LIBEXECDIR ?= $(LIBDIR)/hyperflux-next
 DATADIR ?= $(PREFIX)/share
 MANDIR ?= $(DATADIR)/man
@@ -33,7 +38,8 @@ FISHCOMPDIR ?= $(DATADIR)/fish/vendor_completions.d
 # Group that owns OpenRazer's sysfs files and udev nodes. Arch packages
 # OpenRazer with "openrazer"; Debian, Ubuntu, Fedora and openSUSE use the
 # upstream "plugdev". Package recipes set it; hyperfluxctl is built with the
-# same value (HFX_OPENRAZER_GROUP) so Doctor checks the right group.
+# same value (HFX_OPENRAZER_GROUP) so Doctor checks the right group, and
+# with LIBEXECDIR (HFX_LIBEXECDIR) so it names the right directory.
 OPENRAZER_GROUP ?= plugdev
 # Qt major version of the OpenRGB the plugin is built for: 6 for OpenRGB
 # 1.1, 5 for 1.0.
@@ -61,7 +67,8 @@ all: build
 build: rust
 
 rust:
-	HFX_OPENRAZER_GROUP=$(OPENRAZER_GROUP) $(CARGO) build --release $(CARGO_FLAGS) --workspace
+	HFX_OPENRAZER_GROUP=$(OPENRAZER_GROUP) HFX_LIBEXECDIR=$(LIBEXECDIR) \
+		$(CARGO) build --release $(CARGO_FLAGS) --workspace
 
 lint:
 	$(CARGO) fmt --all --check
@@ -84,7 +91,7 @@ install-openrgb-plugin:
 
 install-rust-linux:
 	install -Dm0755 -t $(DESTDIR)$(LIBEXECDIR) $(RUST_TARGET_DIR)/hyperflux-next-bridge \
-		$(RUST_TARGET_DIR)/hyperflux-next-keeper
+		$(RUST_TARGET_DIR)/hyperflux-next-keeper $(RUST_TARGET_DIR)/hyperflux-next-proxy
 	install -Dm0755 $(RUST_TARGET_DIR)/hyperfluxctl $(DESTDIR)$(BINDIR)/hyperfluxctl
 
 # Component fragments.

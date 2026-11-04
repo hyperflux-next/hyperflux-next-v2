@@ -13,10 +13,16 @@ install-linux: install-linux-files
 install-full: install-full-files
 install-openrgb-plugin: install-openrgb-plugin-files
 
+# The units name the programs in /usr/lib/hyperflux-next, and get
+# LIBEXECDIR when a package sets another.
 install-linux-files:
-	install -Dm0644 -t $(DESTDIR)$(SYSTEMDUNITDIR) systemd/hyperflux-next-bridge.service \
-		systemd/hyperflux-next-keeper.service systemd/hyperflux-next-client@.socket \
-		systemd/hyperflux-next-client@.service
+	for unit in hyperflux-next-bridge.service hyperflux-next-keeper.service hyperflux-next-client@.service; do \
+		install -d $(DESTDIR)$(SYSTEMDUNITDIR) && \
+		sed 's|^ExecStart=/usr/lib/hyperflux-next/|ExecStart=$(LIBEXECDIR)/|' systemd/$$unit \
+			>$(DESTDIR)$(SYSTEMDUNITDIR)/$$unit && \
+		chmod 0644 $(DESTDIR)$(SYSTEMDUNITDIR)/$$unit || exit 1; \
+	done
+	install -Dm0644 -t $(DESTDIR)$(SYSTEMDUNITDIR) systemd/hyperflux-next-client@.socket
 	install -Dm0644 packaging/files/hyperflux-next.sysusers $(DESTDIR)$(SYSUSERSDIR)/hyperflux-next.conf
 	install -Dm0644 udev/99-hyperflux-next.rules $(DESTDIR)$(UDEVRULESDIR)/99-hyperflux-next.rules
 	install -Dm0644 packaging/files/hyperflux-next.modules-load $(DESTDIR)$(MODULESLOADDIR)/hyperflux-next.conf
@@ -65,7 +71,7 @@ lint-packaging:
 	$(MAKE) -s install-linux-files DESTDIR="$$root" && \
 	install -D /bin/true "$$root$(LIBEXECDIR)/hyperflux-next-bridge" && \
 	install -D /bin/true "$$root$(LIBEXECDIR)/hyperflux-next-keeper" && \
-	install -D /bin/true "$$root$(LIBDIR)/systemd/systemd-socket-proxyd" && \
+	install -D /bin/true "$$root$(LIBEXECDIR)/hyperflux-next-proxy" && \
 	for unit in socket service; do \
 		cp "$$root$(SYSTEMDUNITDIR)/hyperflux-next-client@.$$unit" "$$root$(SYSTEMDUNITDIR)/hyperflux-next-client@1000.$$unit"; \
 	done && \
