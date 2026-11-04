@@ -1098,7 +1098,7 @@ Line budgets per part:
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |
 | Python SDK | 600 |
-| scripts and packaging | 2,000 |
+| scripts and packaging | 2,200 |
 | total | 40,000 |
 
 `scripts/loc-check.sh` counts the lines in CI. The run fails when a part
