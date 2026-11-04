@@ -184,6 +184,8 @@ struct Keeper {
     /// When to try the bridge again, and the tries since it last answered.
     retry: (Option<u64>, usize),
     connected: Option<Arc<AtomicU64>>,
+    /// Why /dev/uhid didn't open when we last reached the bridge.
+    uhid_error: Option<String>,
     next_id: u64,
     /// By the composite input's token.
     receivers: BTreeMap<u64, Receiver>,
@@ -230,6 +232,7 @@ impl Keeper {
             ready: false,
             retry: (None, 0),
             connected: config.connected,
+            uhid_error: None,
             next_id: FIRST_ID,
             receivers: BTreeMap::new(),
             pointers: HashMap::new(),
@@ -345,11 +348,17 @@ impl Keeper {
         let stream = UnixStream::connect(&self.socket).map_err(|e| e.to_string());
         match stream.and_then(|s| Channel::new(s, self.bridge_uid)) {
             Ok(mut channel) if self.poll.add(channel.fd(), TOKEN_BRIDGE).is_ok() => {
-                let uhid = (self.uhid)().is_ok();
+                // Each device opens its own file, so this one only tells
+                // the bridge whether making them can work.
+                let uhid = (self.uhid)().map(drop).map_err(|e| reason(&e));
+                if let Err(why) = &uhid {
+                    self.log_once("uhid".into(), &format!("can't open /dev/uhid ({why})"));
+                }
                 channel.send(&FromKeeper::Hello {
                     version: ipc::VERSION,
-                    uhid,
+                    uhid: uhid.is_ok(),
                 });
+                self.uhid_error = uhid.err();
                 self.bridge = Some(channel);
             }
             attempt => {
@@ -424,7 +433,10 @@ impl Keeper {
                 ToKeeper::Hello { version } if version == ipc::VERSION => {
                     eprintln!("connected to the bridge");
                     (self.ready, self.retry) = (true, (None, 0));
-                    self.status(paths::KEEPER_CONNECTED);
+                    match &self.uhid_error {
+                        Some(why) => self.status(&format!("{} ({why})", paths::KEEPER_NO_UHID)),
+                        None => self.status(paths::KEEPER_CONNECTED),
+                    }
                     if let Some(c) = &self.connected {
                         c.fetch_add(1, Ordering::Relaxed);
                     }
@@ -1020,5 +1032,31 @@ fn eio(id: u32, get: bool) -> Vec<u8> {
         uhid::get_reply(id, Err(uhid::EIO))
     } else {
         uhid::set_reply(id, uhid::EIO)
+    }
+}
+
+/// The error without the "(os error 13)" std adds, for the status line.
+fn reason(error: &io::Error) -> String {
+    let text = error.to_string();
+    match text.split_once(" (os error ") {
+        Some((reason, _)) => reason.to_owned(),
+        None => text,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_reasons() {
+        assert_eq!(
+            reason(&io::Error::from_raw_os_error(13)),
+            "Permission denied"
+        );
+        assert_eq!(
+            reason(&io::Error::other("no such device")),
+            "no such device"
+        );
     }
 }

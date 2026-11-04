@@ -130,11 +130,18 @@ pub fn plain(text: &str) -> bool {
     !text.is_empty() && text.len() <= 200 && text.bytes().all(|b| (0x20..0x7f).contains(&b))
 }
 
-/// The uid of a system user, from /etc/passwd, where systemd-sysusers
-/// puts it.
+/// The uid of a system user. systemd-sysusers puts it in /etc/passwd, but
+/// on rpm-ostree systems (Silverblue, Bazzite) a layered package's users
+/// are in /usr/lib/passwd.
 #[must_use]
 pub fn system_uid(name: &str) -> Option<u32> {
-    let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
+    ["/etc/passwd", "/usr/lib/passwd"].iter().find_map(|path| {
+        let passwd = std::fs::read_to_string(path).ok()?;
+        uid_in(&passwd, name)
+    })
+}
+
+fn uid_in(passwd: &str, name: &str) -> Option<u32> {
     passwd.lines().find_map(|line| {
         let mut fields = line.split(':');
         (fields.next()? == name).then_some(())?;
@@ -251,6 +258,18 @@ impl Channel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn passwd_lines() {
+        let passwd =
+            "root:x:0:0::/root:/bin/bash\nhyperflux-next:x:976:976:bridge:/:/usr/sbin/nologin\n";
+        assert_eq!(uid_in(passwd, "hyperflux-next"), Some(976));
+        assert_eq!(uid_in(passwd, "hyperflux"), None);
+        assert_eq!(
+            uid_in("hyperflux-next:x:oops:976::/:\n", "hyperflux-next"),
+            None
+        );
+    }
 
     fn to_keeper(text: &str) -> Option<ToKeeper> {
         serde_json::from_str(text).ok()
