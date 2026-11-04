@@ -18,8 +18,11 @@ about it.
   doesn't package OpenRGB for 13. Distributions based on an Ubuntu LTS
   release, such as Linux Mint, aren't supported either: their OpenRazer is
   just as old, or older.
-- On image-based distributions such as Bazzite or SteamOS, `/usr` is
-  read-only, and the packages can't be installed there.
+- Image-based distributions keep `/usr` read-only. Bazzite, Fedora
+  Silverblue and Kinoite, and openSUSE Aeon and Kalpa can layer Core on
+  top of their image ([how](install-rpm.md#image-based-systems)), but not
+  Full: DKMS cannot build its drivers there. SteamOS can't layer packages
+  at all.
 - The bridge is a systemd service, so distributions that boot another
   init, such as Artix or Devuan, aren't supported.
 - Ubuntu supports 26.10 until July 2027. Debian 14 is still Debian's

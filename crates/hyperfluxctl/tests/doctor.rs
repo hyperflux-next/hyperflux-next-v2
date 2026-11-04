@@ -343,6 +343,32 @@ fn hidraw_and_uhid_group() {
 }
 
 #[test]
+fn selinux_init_t() {
+    let machine = Machine::core();
+    let pid = "systemctl show --property=MainPID --value hyperflux-next-keeper.service";
+    let refused = "connected to the bridge, but can't open /dev/uhid (Permission denied)";
+    machine.runner.answer(pid, "4242").answer(
+        common::KEEPER,
+        &format!("ActiveState=active\nStatusText={refused}"),
+    );
+    machine
+        .tree
+        .file("/proc/4242/attr/current", "system_u:system_r:init_t:s0\0");
+    // Without SELinux enforcing, the domain isn't looked at.
+    assert_eq!(machine.codes(), ["HFX-408"]);
+    machine.tree.file("/sys/fs/selinux/enforce", "1");
+    let json = machine.doctor(&["--json"]).json();
+    assert_eq!(json["findings"][0]["code"], "HFX-209");
+    assert_eq!(json["findings"][0]["details"]["domain"], "init_t");
+    assert_eq!(json["findings"][1]["code"], "HFX-408");
+    machine.tree.file(
+        "/proc/4242/attr/current",
+        "system_u:system_r:unconfined_service_t:s0\0",
+    );
+    assert_eq!(machine.codes(), ["HFX-408"]);
+}
+
+#[test]
 fn keeper_unreachable() {
     let machine = Machine::core();
     machine

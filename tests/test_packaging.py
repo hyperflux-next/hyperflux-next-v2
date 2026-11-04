@@ -151,6 +151,26 @@ def test_keeper_unit():
     assert "[Install]" not in unit and "RuntimeDirectory" not in unit
 
 
+def test_client_unit():
+    # Our own proxy, from the bridge's directory, so SELinux treats it as
+    # it treats the bridge (src/proxy.rs). Its output must not go into
+    # the socket it gets as standard input.
+    unit = read("systemd/hyperflux-next-client@.service")
+    unit_has(unit, ("User=%i", "Group=hyperflux", "ExecStart=/usr/lib/hyperflux-next/hyperflux-next-proxy",
+                    "StandardInput=socket", "StandardOutput=journal", "StandardError=journal",
+                    "NoNewPrivileges=yes", "RestrictAddressFamilies=AF_UNIX", "ReadOnlyPaths=/run/hyperflux-next"))
+    assert "systemd-socket-proxyd" not in unit
+    # Requiring the bridge left the socket failed when the bridge couldn't start.
+    assert "Requires=hyperflux-next-client@%i.socket\n" in unit
+
+
+def test_client_socket():
+    # A stopped bridge mustn't take the user's socket down with it.
+    unit = read("systemd/hyperflux-next-client@.socket")
+    unit_has(unit, ("Wants=hyperflux-next-bridge.service", "After=user-runtime-dir@%i.service hyperflux-next-bridge.service",
+                    "ListenStream=/run/user/%i/hyperflux-next-bridge.sock", "SocketMode=0600", "SocketUser=%i"))
+    assert not any(line.startswith("Requires=") for line in unit.splitlines())
+
 def test_receiver_access():
     # Interface 0 is the bridge's to write and the keeper's to read,
     # interface 1 and /dev/uhid are the keeper's, and 4 is the bridge's.
@@ -214,6 +234,36 @@ def test_debian_old_names():
         assert old <= relations["Conflicts"] and old <= relations["Replaces"], part
         assert provided(old) <= relations["Provides"], part
 
+
+def test_rpm_libexec():
+    # SELinux runs a service unconfined only from a bin_t program, and
+    # /usr/lib is lib_t (Makefile, LIBEXECDIR).
+    spec = read("packaging/rpm/hyperflux-next-v2.spec")
+    assert "LIBEXECDIR=%{_libexecdir}/hyperflux-next" in spec
+    for program in ("hyperflux-next-bridge", "hyperflux-next-keeper", "hyperflux-next-proxy"):
+        assert re.search(rf"(?m)^%{{_libexecdir}}/hyperflux-next/{program}$", spec), program
+    assert "%{_prefix}/lib/hyperflux-next" not in spec
+
+
+def test_rpm_module_requirements():
+    # openSUSE makes each module in a modules-load.d file a requirement.
+    # Nothing provides the ones DKMS builds, and kernel-default-base, which
+    # lacks uhid, would bring in a second kernel for it.
+    spec = read("packaging/rpm/hyperflux-next-v2.spec")
+    exclude = re.search(r"(?m)^%global __requires_exclude (.+)$", spec).group(1).replace("\\\\", "\\")
+    for conf in ("integrations/openrazer/hyperflux-next-openrazer.modules-load.conf",
+                 "packaging/files/hyperflux-next.modules-load"):
+        for module in re.findall(r"(?m)^(\w+)$", read(conf)):
+            dropped = re.search(exclude, f"(kmod({module}.ko) if kernel)") is not None
+            assert dropped, module
+
+def test_rpm_driver_update():
+    # The DKMS version is OpenRazer's, not ours, so an update has to drop
+    # the old build itself before adding the new sources.
+    spec = read("packaging/rpm/hyperflux-next-v2.spec")
+    post = spec.split("\n%post openrazer-driver-dkms\n", 1)[1].split("\n%", 1)[0]
+    remove = post.index('if [ "$1" -gt 1 ]; then\n    dkms remove -m openrazer-driver -v %{openrazer_version} --all || :')
+    assert remove < post.index("dkms add")
 
 def test_rpm_old_names():
     spec = read("packaging/rpm/hyperflux-next-v2.spec")

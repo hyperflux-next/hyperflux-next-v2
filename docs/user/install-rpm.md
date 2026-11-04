@@ -7,8 +7,8 @@ distribution ships an OpenRGB that can load the HyperFlux Next V2 plugin
 openrgb.org can, as [the OpenRGB page](#the-openrgb-page) shows.
 
 Distributions based on Fedora 44 or Tumbleweed can use the same packages.
-Image-based ones such as Bazzite or openSUSE Aeon keep `/usr` read-only,
-so the packages can't be installed on them.
+On image-based ones, such as Bazzite or openSUSE Aeon, you can layer Core
+but not Full: see [image-based systems](#image-based-systems).
 
 You need the HyperFlux receiver plugged in with your keyboard and mouse
 paired to it, and an account that can use `sudo`. Keep the receiver,
@@ -145,6 +145,59 @@ On Fedora, the third line goes away once you have the OpenRGB plugin.
 With Core it reads `Optional Full integration is not installed.` For
 anything else, do what Doctor's `Do:` line says, or look up its code in
 [troubleshooting](troubleshooting.md).
+
+## Image-based systems
+
+Bazzite, Fedora Silverblue and Kinoite, and openSUSE Aeon and Kalpa keep
+`/usr` read-only and add packages on top of the system image. Core layers
+on them. Full does not, as DKMS cannot build its drivers into a read-only
+`/usr`, and OpenRazer apps such as Polychromatic get no devices there. You
+still get the batteries in the desktop, `hyperfluxctl` and Doctor. These
+steps were tested on Fedora CoreOS 44 and openSUSE MicroOS, which layer
+packages the same way. On the Fedora ones the OpenRGB plugin works too, with
+the packages from [the OpenRGB page](#the-openrgb-page) layered by
+`rpm-ostree install` in place of `dnf install`.
+
+The script above layers Core on them by itself. By hand, check the key as
+in step 1 first.
+
+On Bazzite, Silverblue and Kinoite, rpm-ostree reads the key from a file:
+
+```sh
+sudo install -m 0644 hyperflux-next-repository-key.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-hyperflux-next
+curl --proto '=https' --tlsv1.2 -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/fedora/hyperflux-next.repo |
+  sed 's|^gpgkey=.*|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-hyperflux-next|' |
+  sudo tee /etc/yum.repos.d/hyperflux-next.repo >/dev/null
+sudo rpm-ostree install --apply-live hyperflux-next-v2-linux
+sudo systemctl enable hyperflux-next-bridge.service "hyperflux-next-client@$(id -u).socket"
+sudo reboot
+```
+
+`--apply-live` makes Core usable at once, and its units can be enabled
+before the reboot.
+
+On Aeon and Kalpa, everything happens in a new snapshot, which starts at
+the next boot. Note your user id first (`id -u`), because inside the
+snapshot's shell you are root:
+
+```sh
+sudo transactional-update shell
+```
+
+In the shell that opens, with your own id in place of 1000:
+
+```sh
+zypper addrepo https://hyperflux-next.github.io/hyperflux-next-v2/opensuse/hyperflux-next.repo
+zypper refresh
+zypper install hyperflux-next-v2-linux
+systemctl enable hyperflux-next-bridge.service hyperflux-next-client@1000.socket
+exit
+```
+
+`zypper refresh` shows the key's fingerprint and asks whether to trust
+it. Trust it if it matches the release notes, and stop otherwise.
+Then reboot, and check as in step 4: Doctor's third line says the Full
+integration isn't installed.
 
 ## Apps
 

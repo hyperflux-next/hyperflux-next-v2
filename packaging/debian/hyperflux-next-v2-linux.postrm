@@ -4,6 +4,14 @@ set -e
 if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
     udevadm control --reload || true
 fi
+# debhelper only knows the bridge. A login's socket was enabled for that
+# uid, so stop every one and delete the links left in /etc.
+if [ "$1" = remove ]; then
+    if [ -d /run/systemd/system ]; then
+        systemctl stop 'hyperflux-next-client@*.socket' 'hyperflux-next-client@*.service' || true
+    fi
+    rm -f /etc/systemd/system/user-runtime-dir@*.service.wants/hyperflux-next-client@*.socket
+fi
 # The learned waits in the unit's StateDirectory=.
 if [ "$1" = purge ]; then
     rm -rf /var/lib/hyperflux-next

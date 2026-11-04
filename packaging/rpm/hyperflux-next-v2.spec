@@ -8,9 +8,18 @@
 %global openrazer_version 3.12.4
 %global openrazer_commit 1ef8a91712906a89fd332a2ed62bbd105315d6d1
 %global openrgb_commit 8e16de27858cf2be6af54a33ce003df74cb9fd3e
-%global hfx_make %{__make} OPENRAZER_GROUP=plugdev OPENRGB_QT=6 DOCDIR=%{_docdir}/hyperflux-next
+# The bridge, the keeper and the proxy go in libexec, where SELinux lets
+# systemd run them unconfined (Makefile, LIBEXECDIR).
+%global hfx_make %{__make} OPENRAZER_GROUP=plugdev OPENRGB_QT=6 DOCDIR=%{_docdir}/hyperflux-next LIBEXECDIR=%{_libexecdir}/hyperflux-next
 # cargo strips the binaries in its release profile.
 %global debug_package %{nil}
+# openSUSE requires (kmod(NAME.ko) if kernel) for every module a package
+# lists in modules-load.d. No package provides the OpenRazer drivers, which
+# DKMS builds, so with any kernel installed Full couldn't be installed. On
+# kernel-default-base, which has no uhid, zypper met uhid's requirement by
+# adding kernel-vanilla, a second kernel. Doctor's HFX-408 names the kernel
+# to install instead.
+%global __requires_exclude ^\\(kmod\\((razer[a-z]+|uhid)\\.ko\\) if kernel\\)$
 # The packages these take over from all sort below this: the hyperflux-next-*
 # packages of 2.x and of the 1:1.0.0 test build, and the pre-release
 # hyperflux-v2-linux-dkms. The old names are provided at this version, so
@@ -18,7 +27,7 @@
 %global old_names 1:1.0.1
 
 Name:           hyperflux-next-v2
-Version:        1.0.2
+Version:        1.0.3
 Release:        1%{?dist}
 Summary:        Razer devices on a HyperFlux V2 receiver
 License:        GPL-2.0-only
@@ -176,6 +185,14 @@ fi
 
 %preun linux
 %systemd_preun hyperflux-next-bridge.service hyperflux-next-keeper.service
+# Each login's socket is enabled by instance, which %%systemd_preun can't
+# name. On removal, close them and drop their links.
+if [ "$1" -eq 0 ]; then
+    if [ -d /run/systemd/system ]; then
+        systemctl stop 'hyperflux-next-client@*.socket' 'hyperflux-next-client@*.service' || :
+    fi
+    rm -f /etc/systemd/system/user-runtime-dir@*.service.wants/hyperflux-next-client@*.socket
+fi
 
 %posttrans linux
 if rmdir %{_localstatedir}/lib/rpm-state/hyperflux-next-v2-bridge-enabled 2>/dev/null; then
@@ -193,6 +210,12 @@ if [ -f /usr/lib/tmpfiles.d/dkms.conf ]; then
     systemd-tmpfiles --create dkms.conf || :
 fi
 systemd-sysusers openrazer.conf || :
+# An update keeps the DKMS version, OpenRazer's, and DKMS would keep the
+# modules it built from the old sources. The old package's %%preun leaves
+# the new registration alone (--rpm_safe_upgrade).
+if [ "$1" -gt 1 ]; then
+    dkms remove -m openrazer-driver -v %{openrazer_version} --all || :
+fi
 dkms add -m openrazer-driver -v %{openrazer_version} --rpm_safe_upgrade || :
 # Build for every kernel that has headers, but leave installing to
 # dkms.service at the next boot, as the install guides say.
@@ -216,9 +239,10 @@ fi
 %files linux
 %license LICENSE target/LICENSE-rust-crates
 %{_bindir}/hyperfluxctl
-%dir %{_prefix}/lib/hyperflux-next
-%{_prefix}/lib/hyperflux-next/hyperflux-next-bridge
-%{_prefix}/lib/hyperflux-next/hyperflux-next-keeper
+%dir %{_libexecdir}/hyperflux-next
+%{_libexecdir}/hyperflux-next/hyperflux-next-bridge
+%{_libexecdir}/hyperflux-next/hyperflux-next-keeper
+%{_libexecdir}/hyperflux-next/hyperflux-next-proxy
 %{_unitdir}/hyperflux-next-bridge.service
 %{_unitdir}/hyperflux-next-keeper.service
 %{_unitdir}/hyperflux-next-client@.service
@@ -267,6 +291,9 @@ fi
 %endif
 
 %changelog
+* Wed Nov 04 2026 offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com> - 1.0.3-1
+- HyperFlux Next V2 1.0.3
+
 * Fri Oct 30 2026 offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com> - 1.0.2-1
 - HyperFlux Next V2 1.0.2
 

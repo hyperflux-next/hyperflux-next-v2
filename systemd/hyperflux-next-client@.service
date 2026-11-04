@@ -2,7 +2,10 @@
 Description=HyperFlux Next V2 desktop proxy for UID %i
 Documentation=man:hyperfluxctl(1)
 PartOf=user-runtime-dir@%i.service
-Requires=hyperflux-next-client@%i.socket hyperflux-next-bridge.service
+# Not the bridge as well: a proxy that systemd couldn't start for want of
+# the bridge left the socket failed. The proxy closes each connection
+# while the bridge is stopped, and serves the next one once it's back.
+Requires=hyperflux-next-client@%i.socket
 After=hyperflux-next-client@%i.socket hyperflux-next-bridge.service
 
 [Service]
@@ -11,7 +14,12 @@ Type=simple
 # socket, and the user never needs to join the group.
 User=%i
 Group=hyperflux
-ExecStart=/usr/lib/systemd/systemd-socket-proxyd /run/hyperflux-next/bridge.sock
+ExecStart=/usr/lib/hyperflux-next/hyperflux-next-proxy
+# The listening socket comes in as standard input. Output goes to the
+# journal, not back into the socket.
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
 UMask=0077
 TimeoutStartSec=10s
 TimeoutStopSec=10s

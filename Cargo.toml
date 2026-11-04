@@ -9,7 +9,7 @@ members = [
 # The product version. scripts/set-version changes it here and in the other
 # version locations listed in ARCHITECTURE.md; a test checks they agree.
 [workspace.package]
-version = "1.0.2"
+version = "1.0.3"
 edition = "2024"
 rust-version = "1.95"
 license = "GPL-2.0-only"
@@ -27,7 +27,7 @@ serde_json = { version = "=1.0.154", features = ["raw_value"] }
 
 # Safe syscalls: epoll, netlink, clock_gettime(CLOCK_BOOTTIME), SO_PEERCRED,
 # uid/pid, flock, stat.
-rustix = { version = "=1.1.5", features = ["event", "fs", "net", "process", "time", "std"] }
+rustix = { version = "=1.1.6", features = ["event", "fs", "net", "process", "time", "std"] }
 
 # ioctl(2) on the receiver's hidraw nodes. Only hfx-bridge uses it.
 libc = "=0.2.191"

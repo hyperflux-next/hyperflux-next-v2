@@ -7,9 +7,10 @@
 #   curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh
 # It adds the project's package repository and signing key, installs Full
 # (Core with --core) with the kernel headers DKMS needs, enables the bridge
-# and your socket, and offers to reboot. The package manager shows what it
-# will change and asks first, unless --yes answers for you. Running it
-# again does no harm.
+# and your socket, and offers to reboot. On image-based Fedora and openSUSE
+# it layers Core, as Full can't be installed there. The package manager
+# shows what it will change and asks first, unless --yes answers for you.
+# Running it again does no harm.
 
 SITE=https://hyperflux-next.github.io/hyperflux-next-v2
 # The key file the release notes list, pinned by hash: any other file is
@@ -31,7 +32,10 @@ die() {
     exit 3
 }
 as_root() { if [ -n "$sudo" ]; then sudo "$@"; else "$@"; fi; }
-fetch() { curl --proto '=https' --tlsv1.2 -fsSL -o "$2" "$1"; }
+# curl alone waits five minutes for a connection that doesn't open, and
+# gives up at once on a broken TLS handshake. This tries again, three times
+# and whatever failed, after 20 s at most.
+fetch() { curl --proto '=https' --tlsv1.2 --connect-timeout 20 --retry 3 --retry-all-errors -fsSL -o "$2" "$1"; }
 # Shows a command's output only when it fails. pacman-key passes on gpg's
 # trust database notes, which read like errors and aren't.
 quiet() {
@@ -138,6 +142,35 @@ install_dnf() {
     pm dnf install ${yes:+-y} $erase $pkgs
 }
 
+# Silverblue, Kinoite, Bazzite. rpm-ostree reads the key from a file, and
+# --apply-live makes Core usable now, so its units can be enabled; the next
+# boot keeps it.
+install_rpm_ostree() {
+    say "Adding the key and the repository"
+    as_root install -m 0644 "$tmp/key.asc" /etc/pki/rpm-gpg/RPM-GPG-KEY-hyperflux-next
+    fetch "$SITE/fedora/hyperflux-next.repo" "$tmp/repo"
+    sed 's|^gpgkey=.*|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-hyperflux-next|' "$tmp/repo" >"$tmp/repo.file"
+    as_root install -m 0644 "$tmp/repo.file" /etc/yum.repos.d/hyperflux-next.repo
+    say "Layering hyperflux-next-v2-linux"
+    pm rpm-ostree install --idempotent --apply-live hyperflux-next-v2-linux
+}
+
+# Aeon, Kalpa, MicroOS. Everything happens in a new snapshot, which starts
+# at the next boot, so the units are enabled in there too. The snapshot
+# sees none of this system's files, so the checked key goes in as text.
+install_transactional() {
+    say "Adding the key and the repository, and installing hyperflux-next-v2-linux"
+    key=$(base64 -w0 "$tmp/key.asc")
+    socket=
+    [ -n "$uid" ] && [ "$uid" != 0 ] && socket="hyperflux-next-client@$uid.socket"
+    pm transactional-update ${yes:+--non-interactive} run sh -c "k=\$(mktemp) && echo $key | base64 -d >\"\$k\" &&
+        rpm --import \"\$k\" && rm -f \"\$k\" &&
+        { zypper -q lr hyperflux-next >/dev/null 2>&1 || zypper -q addrepo $SITE/opensuse/hyperflux-next.repo; } &&
+        zypper ${yes:+--non-interactive} install hyperflux-next-v2-linux &&
+        systemctl enable hyperflux-next-bridge.service $socket"
+    enabled=yes
+}
+
 install_zypper() {
     uri=$(zypper -q lr hyperflux-next 2>/dev/null | sed -n 's/^URI *: *//p')
     case $uri in
@@ -203,6 +236,17 @@ detect() {
     [ -n "$target" ] || die "$name isn't supported. HyperFlux Next V2 has packages for $SUPPORTED, and distributions based on those releases can use them."
 }
 
+enable_units() {
+    say "Enabling the bridge and your socket"
+    units=hyperflux-next-bridge.service
+    # openSUSE ships dkms.service turned off, and the driver package leaves
+    # installing the OpenRazer drivers to it at the next boot.
+    [ "$target" = opensuse ] && [ "$edition" = full ] && units="dkms.service $units"
+    [ -n "$uid" ] && [ "$uid" != 0 ] && units="$units hyperflux-next-client@$uid.socket"
+    # shellcheck disable=SC2086
+    as_root systemctl enable $units
+}
+
 main() {
     set -eu
     edition=full
@@ -237,9 +281,24 @@ main() {
         init | runit | s6-svscan | openrc-init | dinit) die "$name doesn't run systemd, and the bridge needs it." ;;
         esac
     fi
-    # The last mount listed for / or /usr is the one in effect.
+    # The last mount listed for / or /usr is the one in effect. Image-based
+    # Fedora and openSUSE layer packages, and Core layers, as it adds no
+    # kernel module. DKMS can't build Full's drivers into a read-only /usr.
+    layer=
     case $(awk '$2 == "/" || $2 == "/usr" {o = $4} END {print o}' /proc/mounts) in
-    ro*) die "$name keeps /usr read-only, so the packages can't be installed on it." ;;
+    ro*)
+        if [ "$target" = fedora ] && [ -e /run/ostree-booted ]; then
+            layer=rpm-ostree
+        elif [ "$target" = opensuse ] && [ -x /usr/sbin/transactional-update ]; then
+            layer=transactional-update
+        else
+            die "$name keeps /usr read-only, so the packages can't be installed on it."
+        fi
+        if [ "$edition" = full ]; then
+            say "$name keeps /usr read-only, so Full's drivers can't be built there. Installing Core"
+            edition=core
+        fi
+        ;;
     esac
 
     tmp=$(mktemp -d)
@@ -252,23 +311,13 @@ main() {
     case $target in
     arch) install_arch ;;
     ubuntu | debian) install_apt ;;
-    fedora) install_dnf ;;
-    opensuse) install_zypper ;;
+    fedora) if [ "$layer" = rpm-ostree ]; then install_rpm_ostree; else install_dnf; fi ;;
+    opensuse) if [ -n "$layer" ]; then install_transactional; else install_zypper; fi ;;
     esac
 
-    say "Enabling the bridge and your socket"
-    units=hyperflux-next-bridge.service
-    # openSUSE ships dkms.service turned off, and the driver package leaves
-    # installing the OpenRazer drivers to it at the next boot.
-    [ "$target" = opensuse ] && [ "$edition" = full ] && units="dkms.service $units"
-    if [ -n "$uid" ] && [ "$uid" != 0 ]; then
-        # shellcheck disable=SC2086
-        as_root systemctl enable $units "hyperflux-next-client@$uid.socket"
-    else
-        # shellcheck disable=SC2086
-        as_root systemctl enable $units
+    [ -n "${enabled:-}" ] || enable_units
+    [ -n "$uid" ] && [ "$uid" != 0 ] ||
         echo "Each desktop user also needs their socket: systemctl enable hyperflux-next-client@UID.socket"
-    fi
 
     echo
     echo "HyperFlux Next V2 is installed. Reboot to finish, then run: hyperfluxctl doctor"

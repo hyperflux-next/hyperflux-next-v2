@@ -20,6 +20,7 @@ mod methods;
 pub mod notify;
 pub mod platform;
 pub mod poll;
+pub mod proxy;
 pub mod server;
 pub mod sim;
 pub mod state;

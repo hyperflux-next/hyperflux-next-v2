@@ -5,7 +5,10 @@ Documentation=man:hyperfluxctl(1)
 # Conflicts= and Before= lines below keep the part that's needed.
 DefaultDependencies=no
 PartOf=user-runtime-dir@%i.service
-Requires=hyperflux-next-bridge.service
+# Only Wants=, which starts the bridge at login. With Requires=, stopping
+# the bridge closed this socket, and starting the bridge again left it
+# closed until the next login.
+Wants=hyperflux-next-bridge.service
 After=user-runtime-dir@%i.service hyperflux-next-bridge.service
 Conflicts=shutdown.target
 Before=shutdown.target

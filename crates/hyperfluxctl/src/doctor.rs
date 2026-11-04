@@ -9,6 +9,8 @@
 //! /dev/uhid. Those checks come first. Order and suppression:
 //!
 //! - An old driver that can still load (HFX-303) is always reported first.
+//! - SELinux running a service as init_t (HFX-209) comes next: it explains
+//!   the receiver and keeper findings that follow it.
 //! - A receiver they cannot open hides the bridge and battery findings.
 //! - A keeper that isn't working (HFX-208) hides the battery findings.
 //! - The Full checks run on their own.
@@ -54,6 +56,12 @@ const DKMS_KEYS: &[&str] = &["/var/lib/dkms/mok.pub", "/var/lib/shim-signed/mok/
 const KEY_RULES_OVERRIDE: &str = "/etc/udev/rules.d/70-hyperflux-next-openrazer-keys.rules";
 const BY_ID: &str = "/dev/input/by-id";
 const BUSCTL: &str = "busctl --user --no-pager --no-legend";
+/// Where the bridge and the keeper are installed, as the package build
+/// sets it (Makefile, LIBEXECDIR).
+const LIBEXEC_DIR: &str = match option_env!("HFX_LIBEXECDIR") {
+    Some(dir) => dir,
+    None => "/usr/lib/hyperflux-next",
+};
 
 pub enum Bridge {
     Up {
@@ -163,6 +171,8 @@ pub struct Keeper {
     pub state: String,
     /// Its status says the bridge has it.
     pub connected: bool,
+    /// Why it couldn't open /dev/uhid, from its status.
+    pub uhid_error: Option<String>,
 }
 
 pub struct Facts {
@@ -181,6 +191,8 @@ pub struct Facts {
     pub keeper_gid: Option<u32>,
     /// Owner, group and mode of /dev/uhid, if it exists.
     pub uhid: Option<NodeAccess>,
+    /// The running kernel has uhid: loaded, built in or as a module file.
+    pub kernel_uhid: bool,
     /// Users an ACL lets write /dev/uhid.
     pub uhid_acl_users: Vec<u32>,
     /// The LampArray nodes this login can open for reading and writing,
@@ -192,6 +204,8 @@ pub struct Facts {
     /// The power supplies that have a model name.
     pub batteries: Vec<PowerSupply>,
     pub full: Full,
+    /// Units SELinux runs as init_t, with the domain.
+    pub confined: Vec<(String, String)>,
 }
 
 impl Facts {
@@ -256,19 +270,22 @@ pub fn probe(system: &System, reach: Reach) -> Facts {
     let mut facts = Facts {
         service: system.run(&service).filter(|v| !v.is_empty()),
         bridge,
-        keeper: keeper(system),
+        keeper: keeper_settled(system),
         receivers_attached: receivers_strict(system).unwrap_or(0),
         interfaces: interfaces(system),
         bridge_uid: system.user_id(paths::BRIDGE_USER),
         bridge_gid: system.group_id(paths::BRIDGE_USER),
         keeper_gid: system.group_id(paths::KEEPER_USER),
         uhid: system.access(paths::UHID_DEVICE),
+        kernel_uhid: system.is_dir("/sys/module/uhid")
+            || system.run("modinfo -F filename uhid").is_some(),
         uhid_acl_users: system.acl_users(paths::UHID_DEVICE, 0o2),
         lamparray_open: Vec::new(),
         leftovers,
         retired,
         batteries: batteries.iter().filter_map(supply).collect(),
         full,
+        confined: confined(system),
     };
     facts.lamparray_open = lamparray_open(system, &facts);
     facts
@@ -276,6 +293,22 @@ pub fn probe(system: &System, reach: Reach) -> Facts {
 
 /// The keeper's `ActiveState`, and whether its `StatusText` says the bridge
 /// has it.
+/// The keeper tries the bridge again every 2 s at most, so just after the
+/// bridge starts it may not be back yet. A running keeper gets a few seconds.
+fn keeper_settled(system: &System) -> Option<Keeper> {
+    let started = std::time::Instant::now();
+    let mut keeper = self::keeper(system);
+    while keeper
+        .as_ref()
+        .is_some_and(|k| k.state == "active" && !k.connected)
+        && started.elapsed() < system.settle
+    {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        keeper = self::keeper(system);
+    }
+    keeper
+}
+
 fn keeper(system: &System) -> Option<Keeper> {
     let line = format!(
         "systemctl show --property=ActiveState,StatusText {}",
@@ -284,8 +317,39 @@ fn keeper(system: &System) -> Option<Keeper> {
     let shown = system.run(&line)?;
     let value = |key: &str| shown.lines().find_map(|l| l.strip_prefix(key));
     let state = value("ActiveState=").filter(|v| !v.is_empty())?.to_owned();
-    let connected = value("StatusText=") == Some(paths::KEEPER_CONNECTED);
-    Some(Keeper { state, connected })
+    let status = value("StatusText=").unwrap_or_default();
+    let uhid_error = status.strip_prefix(paths::KEEPER_NO_UHID).map(|why| {
+        why.trim()
+            .trim_start_matches('(')
+            .trim_end_matches(')')
+            .to_owned()
+    });
+    let connected = status == paths::KEEPER_CONNECTED || uhid_error.is_some();
+    Some(Keeper {
+        state,
+        connected,
+        uhid_error,
+    })
+}
+
+/// With SELinux enforcing, the bridge and keeper units it runs as init_t.
+/// systemd's own domain may not open hidraw nodes or /dev/uhid, and a
+/// service lands in it when its program isn't labelled bin_t.
+fn confined(system: &System) -> Vec<(String, String)> {
+    if system.read("/sys/fs/selinux/enforce").as_deref() != Some("1") {
+        return Vec::new();
+    }
+    let domain = |unit: &str| {
+        let line = format!("systemctl show --property=MainPID --value {unit}");
+        let pid = system.run(&line).filter(|pid| pid != "0")?;
+        let context = system.read(&format!("/proc/{pid}/attr/current"))?;
+        let domain = context.trim_end_matches('\0').split(':').nth(2)?.to_owned();
+        (domain == "init_t").then(|| (unit.to_owned(), domain))
+    };
+    [paths::BRIDGE_UNIT, paths::KEEPER_UNIT]
+        .into_iter()
+        .filter_map(domain)
+        .collect()
 }
 
 /// USB devices with the receiver's ids. `Err` when sysfs cannot be read
@@ -1089,19 +1153,44 @@ fn receiver_finding(facts: &Facts, driver: &Driver) -> Option<Finding> {
     ))
 }
 
+/// The node's group and mode first: when they're wrong, they are why the
+/// keeper can't open it.
 fn uhid_finding(facts: &Facts) -> Option<Finding> {
-    let problem = match (facts.uhid, facts.keeper_gid) {
-        (None, _) => "it doesn't exist; the uhid module isn't loaded".to_owned(),
-        (_, None) => format!("there is no {} group", paths::KEEPER_USER),
-        (Some((_, gid, mode)), Some(group)) if gid != group || mode & 0o777 != 0o660 => {
+    let refused = facts.keeper.as_ref().and_then(|k| k.uhid_error.as_deref());
+    // Some small kernels, such as Debian's cloud kernel and openSUSE's
+    // kernel-default-base, leave uhid out, and no reboot brings it back.
+    let no_module = facts.uhid.is_none() && !facts.kernel_uhid;
+    let remedy = if no_module {
+        "Install your distribution's standard kernel, which has uhid (kernel-default on \
+         openSUSE, linux-image-amd64 on Debian), and reboot into it."
+    } else {
+        "Reboot so the HyperFlux Next V2 udev rules apply and the uhid module loads. \
+         If it's still reported, reinstall hyperflux-next-v2-linux."
+    };
+    let problem = match (facts.uhid, facts.keeper_gid, refused) {
+        _ if no_module => "it doesn't exist, and the running kernel has no uhid module".to_owned(),
+        (None, _, _) => "it doesn't exist; the uhid module isn't loaded".to_owned(),
+        (_, None, _) => format!("there is no {} group", paths::KEEPER_USER),
+        (Some((_, gid, mode)), Some(group), _) if gid != group || mode & 0o777 != 0o660 => {
             format!("it is group {gid}, mode {mode:04o}")
         }
+        (_, _, Some(why)) => format!("the keeper can't open it ({why})"),
         _ => return None,
     };
     Some(Finding::new(
         ErrorCode::UhidNotWritable,
-        &[("uhid", &problem)],
+        &[("uhid", &problem), ("remedy", remedy)],
     ))
+}
+
+fn confined_finding(facts: &Facts) -> Option<Finding> {
+    let (unit, domain) = facts.confined.first()?;
+    let details = [
+        ("unit", unit.as_str()),
+        ("domain", domain),
+        ("dir", LIBEXEC_DIR),
+    ];
+    Some(Finding::new(ErrorCode::ServiceConfined, &details))
 }
 
 fn dkms_remedy(registration: &str) -> String {
@@ -1186,6 +1275,7 @@ fn inert_findings(facts: &Facts) -> Option<Finding> {
 pub fn assess(facts: &Facts) -> Assessment {
     let driver = driver(facts);
     let mut findings = leftover_findings(facts);
+    findings.extend(confined_finding(facts));
     let receiver = receiver_finding(facts, &driver);
     let receiver_ok = receiver.is_none();
     findings.extend(receiver);
@@ -1249,6 +1339,15 @@ fn readiness(facts: &Facts) -> Option<Finding> {
             return Some(Finding::new(
                 ErrorCode::NoSocketAccess,
                 &[("socket", socket)],
+            ));
+        }
+        // Through the user's socket, the proxy can fail to reach a bridge
+        // that systemd calls active, and HFX-201's enable --now would do
+        // nothing for it.
+        Bridge::Down { why } if facts.service.as_deref() == Some("active") => {
+            return Some(Finding::new(
+                ErrorCode::ServiceNotAnswering,
+                &[("why", why)],
             ));
         }
         Bridge::Down { why } => {
@@ -1559,6 +1658,7 @@ mod tests {
             keeper: Some(Keeper {
                 state: "active".into(),
                 connected: true,
+                uhid_error: None,
             }),
             receivers_attached: 1,
             interfaces: (0..5).map(interface).collect(),
@@ -1566,6 +1666,7 @@ mod tests {
             bridge_gid: Some(GID),
             keeper_gid: Some(GID),
             uhid: Some((0, GID, 0o660)),
+            kernel_uhid: true,
             uhid_acl_users: Vec::new(),
             lamparray_open: Vec::new(),
             leftovers: Leftovers::default(),
@@ -1577,6 +1678,7 @@ mod tests {
                 })
                 .to_vec(),
             full: Full::NotInstalled,
+            confined: Vec::new(),
         }
     }
 
@@ -1644,6 +1746,37 @@ mod tests {
     }
 
     #[test]
+    fn selinux_domain() {
+        let mut facts = healthy();
+        facts.confined = vec![(paths::KEEPER_UNIT.into(), "init_t".into())];
+        if let Some(keeper) = &mut facts.keeper {
+            keeper.uhid_error = Some("Permission denied".into());
+        }
+        let findings = assess(&facts).findings;
+        assert_eq!(findings[0].code.id(), "HFX-209");
+        assert!(
+            findings[0]
+                .cause()
+                .starts_with("SELinux runs hyperflux-next-keeper.service as init_t, which "),
+            "{}",
+            findings[0].cause()
+        );
+        assert_eq!(findings[1].code.id(), "HFX-408");
+        assert!(
+            findings[1]
+                .cause()
+                .ends_with("but the keeper can't open it (Permission denied).")
+        );
+        // Wrong permissions explain the refusal, so they're what it names.
+        facts.uhid = Some((0, 0, 0o600));
+        assert!(
+            assess(&facts).findings[1]
+                .cause()
+                .ends_with("but it is group 0, mode 0600.")
+        );
+    }
+
+    #[test]
     fn uhid_and_readiness() {
         let mut facts = healthy();
         facts.uhid = Some((0, 0, 0o600));
@@ -1653,6 +1786,24 @@ mod tests {
             finding.cause(),
             "The keeper needs /dev/uhid, with group hyperflux-keeper and mode 0660, \
              but it is group 0, mode 0600."
+        );
+        assert!(
+            finding
+                .action()
+                .starts_with("Reboot so the HyperFlux Next V2 udev rules")
+        );
+        let mut facts = healthy();
+        (facts.uhid, facts.kernel_uhid) = (None, false);
+        let finding = &assess(&facts).findings[0];
+        assert!(
+            finding
+                .cause()
+                .ends_with("but it doesn't exist, and the running kernel has no uhid module.")
+        );
+        assert!(
+            finding
+                .action()
+                .starts_with("Install your distribution's standard kernel")
         );
         let mut facts = healthy();
         if let Bridge::Up { snapshot, .. } = &mut facts.bridge {
@@ -1829,9 +1980,27 @@ No action required.
     }
 
     #[test]
+    fn active_but_silent() {
+        let mut facts = healthy();
+        facts.bridge = Bridge::Down {
+            why: "the connection closed".into(),
+        };
+        let finding = &assess(&facts).findings[0];
+        assert_eq!(finding.code.id(), "HFX-210");
+        assert_eq!(
+            finding.cause(),
+            "hyperflux-next-bridge.service is active, but Doctor got no answer from it: \
+             the connection closed."
+        );
+        facts.service = Some("inactive".into());
+        assert_eq!(codes(&facts), ["HFX-201"]);
+    }
+
+    #[test]
     fn full_section_order() {
         let mut facts = healthy();
         facts.bridge = Bridge::Down { why: "x".into() };
+        facts.service = Some("failed".into());
         let mut full = full_ready();
         full.modules[1].capability = Some(false);
         full.modules[3].installed = None;

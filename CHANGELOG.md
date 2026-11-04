@@ -2,6 +2,57 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.3
+
+With SELinux enforcing, as on Fedora and new Tumbleweed installs, the
+bridge couldn't open the receiver and nothing worked. On Fedora and
+openSUSE, reboot after updating: updates don't restart the services.
+
+### Added
+
+- `install.sh` layers Core on image-based Fedora and openSUSE, such as
+  Bazzite or Aeon ([how](docs/user/install-rpm.md#image-based-systems)).
+
+### Changed
+
+- Updates on Fedora and openSUSE rebuild the OpenRazer drivers, which are
+  unchanged since 1.0.0.
+
+### Fixed
+
+- On Fedora and openSUSE, the bridge and keeper run from
+  `/usr/libexec/hyperflux-next`, unconfined by SELinux
+  ([#11](https://github.com/hyperflux-next/hyperflux-next-v2/issues/11)).
+- The proxy behind your socket is now `hyperflux-next-proxy`. Tumbleweed's
+  SELinux blocked `systemd-socket-proxyd`.
+- Full can be installed on openSUSE: rpm no longer asks the kernel for
+  DKMS-built drivers.
+- On Debian and openSUSE, Doctor reported HFX-401 with the drivers loaded:
+  it couldn't find `modinfo`.
+- On openSUSE's `kernel-default-base`, installing Core pulled in a second
+  kernel.
+- After a bridge stop and start, your socket stayed closed until the next
+  login.
+- Removing Core on Debian, Fedora or openSUSE left each login's socket
+  enabled.
+- Doctor reports HFX-209 when SELinux runs a service as `init_t`.
+- Doctor said ready while the keeper couldn't open `/dev/uhid`. HFX-408
+  says why now.
+- On a kernel without uhid, HFX-408 names the kernel to install.
+- Doctor reported a running but silent bridge as stopped. It reports
+  HFX-210 now.
+- Just after the bridge started, Doctor could report HFX-208 while the
+  keeper was still reconnecting.
+- A stalled download in `install.sh` now times out after 20 seconds and is
+  retried three times.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.2
 
 `install.sh` now runs on distributions based on a supported release,

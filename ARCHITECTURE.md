@@ -30,6 +30,10 @@ device table and the OpenRazer route constants. Then the device catalog,
   fixed templates, and for the OpenRazer ones it passes the kernel's
   requests to the bridge and the bridge's answers back. One process, one
   event loop (section 4). Section 7 says why it's separate.
+- The proxy, `hyperflux-next-proxy` (`proxy.rs` in `crates/hfx-bridge`),
+  runs as the user whose socket it serves. systemd starts one per user
+  from `hyperflux-next-client@.socket`, and it copies that user's
+  connections to the system socket and back without reading them.
 - The simulator, `hyperflux-next-sim` (`crates/hfx-bridge`), runs as any
   user. It's a fake receiver behind hidraw, for running the whole stack
   without hardware. A developer tool, not packaged.
@@ -97,9 +101,8 @@ The accounts and groups, from sysusers:
 - `hyperflux-keeper`, a user and group with the keeper alone in it. It can
   read interfaces 0 and 1 and use `/dev/uhid` (Core), and write the four
   OpenRazer `unbind` files (Full).
-- `hyperflux`, a group for the bridge, the keeper and the
-  `systemd-socket-proxyd` instances. It grants access to the sockets in
-  `/run/hyperflux-next`.
+- `hyperflux`, a group for the bridge, the keeper and the proxies. It
+  grants access to the sockets in `/run/hyperflux-next`.
 - `openrazer` or `plugdev`, the group for OpenRazer's users, with access to
   OpenRazer's sysfs files. Each distribution's build picks the name.
 
@@ -269,7 +272,7 @@ exchange on the simulator (section 6).
 ### Lighting through OpenRGB (the plugin package)
 
 ```
-OpenRGB + plugin --/run/user/UID/hyperflux-next-bridge.sock--> systemd-socket-proxyd
+OpenRGB + plugin --/run/user/UID/hyperflux-next-bridge.sock--> hyperflux-next-proxy
      --/run/hyperflux-next/bridge.sock--> bridge --hidraw--> receiver --> device
 ```
 
@@ -384,8 +387,9 @@ install.
 
 | Path | Owner | |
 | --- | --- | --- |
-| `/usr/lib/hyperflux-next/hyperflux-next-bridge` | Core | |
-| `/usr/lib/hyperflux-next/hyperflux-next-keeper` | Core | |
+| `/usr/lib/hyperflux-next/hyperflux-next-bridge` | Core | `/usr/libexec/hyperflux-next/` on Fedora and openSUSE |
+| `/usr/lib/hyperflux-next/hyperflux-next-keeper` | Core | as the bridge |
+| `/usr/lib/hyperflux-next/hyperflux-next-proxy` | Core | as the bridge |
 | `/usr/bin/hyperfluxctl` | Core | |
 | `/run/hyperflux-next/` | `RuntimeDirectory=`, 2750 `hyperflux-next:hyperflux` | |
 | `/run/hyperflux-next/bridge.sock` | bridge, 0660 | system socket |
@@ -407,6 +411,20 @@ The bridge unit is `Type=notify` with `NotifyAccess=main` and
 `WatchdogSec=30s`. It restarts with `Restart=on-failure` and
 `RestartSec=2s`. `ExecStart=/usr/lib/hyperflux-next/hyperflux-next-bridge`
 takes no arguments. There's no configuration file.
+
+Fedora and openSUSE build with `LIBEXECDIR=/usr/libexec/hyperflux-next`,
+and the units are installed with that path. With SELinux, systemd runs a
+service as `unconfined_service_t` only when its program is labelled
+`bin_t`, as files in `/usr/libexec` are. From `/usr/lib` (`lib_t`) both
+services would stay in `init_t`, which can't open hidraw nodes or
+`/dev/uhid`, and Doctor reports HFX-209.
+
+The proxy sits in the same directory so that it gets the same domain as
+the bridge. `systemd-socket-proxyd` has a domain of its own, and policies
+disagree on whether systemd may switch to it under `NoNewPrivileges`.
+Fedora 44 keeps it in `init_t`, Tumbleweed gives it
+`systemd_socket_proxyd_t`, and neither may connect to an unconfined
+bridge. That's why the units don't use it.
 
 The bridge runs as `User=hyperflux-next`, `Group=hyperflux` and
 `SupplementaryGroups=hyperflux-next`. It gets
@@ -456,10 +474,16 @@ virtual devices. It has no `[Install]` section, because the bridge pulls it
 in. It has no runtime or state directory either, and the bridge's runtime
 directory can't be shared, as systemd removes it when the bridge stops.
 
-`hyperflux-next-client@.socket` and its `@.service` set
-`DefaultDependencies=no`, with `Conflicts=` and `Before=shutdown.target`.
-The socket has `SocketMode=0600` and `SocketUser=%i`. The proxy runs as
-`%i:hyperflux`, and reads `/run/hyperflux-next` without writing to it.
+`hyperflux-next-client@.socket` sets `DefaultDependencies=no`, with
+`Conflicts=` and `Before=shutdown.target`: the default ones made an ordering
+cycle at shutdown. It has `SocketMode=0600` and `SocketUser=%i`, and only
+`Wants=` the bridge, so stopping the bridge leaves it listening. Its
+`@.service` doesn't require the bridge at all: while the bridge is stopped
+the proxy closes each connection, and it serves the next one once the bridge
+is back. The proxy runs as `%i:hyperflux`, and reads `/run/hyperflux-next`
+without writing to it. It gets the listening socket as standard input
+(`StandardInput=socket`), so its own output has to go to the journal. It
+takes 64 connections at once and closes any more.
 
 There are no other units or drop-ins.
 
@@ -1074,7 +1098,7 @@ Line budgets per part:
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |
 | Python SDK | 600 |
-| scripts and packaging | 2,000 |
+| scripts and packaging | 2,200 |
 | total | 40,000 |
 
 `scripts/loc-check.sh` counts the lines in CI. The run fails when a part

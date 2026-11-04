@@ -36,6 +36,9 @@ pub const KEEPER_USER: &str = "hyperflux-keeper";
 /// and while it waits for one.
 pub const KEEPER_CONNECTED: &str = "connected to the bridge";
 pub const KEEPER_WAITING: &str = "waiting for the bridge";
+/// Its status while the bridge has it but it can't open /dev/uhid, with
+/// the reason after it in parentheses.
+pub const KEEPER_NO_UHID: &str = "connected to the bridge, but can't open /dev/uhid";
 
 #[must_use]
 pub fn user_socket(uid: u32) -> PathBuf {
