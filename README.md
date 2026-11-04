@@ -43,8 +43,10 @@ person.
 
 There are packages for Arch Linux, Ubuntu 26.10, Debian 14, Fedora 44 and
 openSUSE Tumbleweed, all on x86_64. A distribution based on one of these
-releases can use the same packages, unless it doesn't run systemd or keeps
-`/usr` read-only ([limitations](docs/user/limitations.md#distributions)).
+releases can use the same packages, unless it doesn't run systemd. On
+image-based Fedora and openSUSE, such as Bazzite or Aeon, Core can be
+installed, but not Full
+([limitations](docs/user/limitations.md#distributions)).
 Plug the receiver in before you start.
 
 ### The quick way
