@@ -1,6 +1,6 @@
 [package]
 name = "hfx-bridge"
-description = "HyperFlux Next V2 bridge and device keeper daemons, OpenRazer routes and receiver simulator"
+description = "HyperFlux Next V2 bridge and device keeper daemons, per-user socket proxy, OpenRazer routes and receiver simulator"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,6 +14,10 @@ path = "src/main.rs"
 [[bin]]
 name = "hyperflux-next-keeper"
 path = "src/bin/hyperflux-next-keeper.rs"
+
+[[bin]]
+name = "hyperflux-next-proxy"
+path = "src/bin/hyperflux-next-proxy.rs"
 
 [[bin]]
 name = "hyperflux-next-sim"

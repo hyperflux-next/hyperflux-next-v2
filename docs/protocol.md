@@ -15,7 +15,7 @@ The bridge listens on a Unix stream socket.
 | Socket | Who can connect |
 | --- | --- |
 | `/run/hyperflux-next/bridge.sock` | root and members of the `hyperflux` group. Owned by the `hyperflux-next` user. |
-| `/run/user/<uid>/hyperflux-next-bridge.sock` | that user. Created by `hyperflux-next-client@<uid>.socket` and forwarded to the system socket by `systemd-socket-proxyd`. |
+| `/run/user/<uid>/hyperflux-next-bridge.sock` | that user. Created by `hyperflux-next-client@<uid>.socket` and forwarded to the system socket by `hyperflux-next-proxy`. |
 
 A client running as root uses the system socket. Everyone else tries the
 per-user socket first, then the system socket. `HYPERFLUX_NEXT_SOCKET`

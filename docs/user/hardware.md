@@ -162,6 +162,7 @@ OpenRazer, refused commands, serials and the cable. Key presses and pointer
 movement are not recorded. There are no serial numbers in it either, and
 [privacy](privacy.md#files-for-bug-reports) lists what else it leaves out.
 
-Then open a
-[device report](https://github.com/hyperflux-next/hyperflux-next-v2/issues/new?template=device_support.yml),
-attach the file, give the device's name and tick what you saw work.
+Then post a
+[device report](https://github.com/hyperflux-next/hyperflux-next-v2/discussions/new?category=device-reports),
+attach the file, give the device's name and tick what you saw work. Reports
+live in Discussions, where other owners of the same device can add theirs.

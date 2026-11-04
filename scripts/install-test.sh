@@ -20,8 +20,15 @@ openrazer=3.12.4
 group=plugdev
 stock=(openrazer-daemon python3-openrazer)
 units=/usr/lib/systemd/system rules=/usr/lib/udev/rules.d
-bridge_bin=/usr/lib/hyperflux-next/hyperflux-next-bridge
-keeper_bin=/usr/lib/hyperflux-next/hyperflux-next-keeper
+# Fedora and openSUSE put the bridge, the keeper and the proxy in libexec,
+# for SELinux (Makefile, LIBEXECDIR).
+case $target in
+fedora | opensuse) libexec=/usr/libexec/hyperflux-next ;;
+*) libexec=/usr/lib/hyperflux-next ;;
+esac
+bridge_bin=$libexec/hyperflux-next-bridge
+keeper_bin=$libexec/hyperflux-next-keeper
+proxy_bin=$libexec/hyperflux-next-proxy
 plugin=/usr/lib/openrgb/plugins/hyperflux-next-openrgb.so
 full_json=/usr/share/hyperflux-next/components/full.json
 # OpenRGB 1.1 from openrgb.org, which the Ubuntu and Fedora plugin packages
@@ -176,6 +183,17 @@ bridge_on_simulator() {
     if setpriv --reuid=65534 --regid=65534 --clear-groups hyperfluxctl battery >/dev/null 2>&1; then
         fail "a user outside hyperflux reached the bridge"
     fi
+    # Through the proxy they do. It runs as the user with the hyperflux
+    # group, as hyperflux-next-client@.service starts it.
+    install -d -o 65534 -m 0700 "$work/user"
+    setpriv --reuid=65534 --regid=hyperflux --clear-groups "$proxy_bin" --listen "$work/user/bridge.sock" \
+        2>"$work/proxy.log" &
+    local proxy_pid=$!
+    within 10 test -S "$work/user/bridge.sock" || { cat "$work/proxy.log" >&2; fail "the proxy didn't start"; }
+    HYPERFLUX_NEXT_SOCKET=$work/user/bridge.sock setpriv --reuid=65534 --regid=65534 --clear-groups \
+        hyperfluxctl battery >/dev/null || { cat "$work/proxy.log" >&2; fail "the proxy didn't get its user to the bridge"; }
+    kill "$proxy_pid"
+    wait "$proxy_pid" 2>/dev/null || true
     kill -TERM "$keeper_pid"
     wait "$keeper_pid" || { cat "$work/keeper.log" >&2; fail "the keeper didn't stop cleanly"; }
     kill -TERM "$bridge_pid"
@@ -239,7 +257,7 @@ for user in hyperflux-next hyperflux-keeper; do
     getent passwd "$user" >/dev/null || fail "no $user user"
     id -nG "$user" | tr ' ' '\n' | grep -qx hyperflux || fail "$user isn't in the hyperflux group"
 done
-for file in /usr/bin/hyperfluxctl "$bridge_bin" "$keeper_bin" "$rules/99-hyperflux-next.rules" \
+for file in /usr/bin/hyperfluxctl "$bridge_bin" "$keeper_bin" "$proxy_bin" "$rules/99-hyperflux-next.rules" \
     /usr/lib/modules-load.d/hyperflux-next.conf /usr/lib/sysusers.d/hyperflux-next.conf \
     "$units/hyperflux-next-bridge.service" "$units/hyperflux-next-keeper.service" \
     "$units/hyperflux-next-client@.socket" \
@@ -252,6 +270,10 @@ contents hyperflux-next-v2-linux | grep '^/usr/share/man/man1/hyperfluxctl\.1' >
 hyperfluxctl --version | grep -qF "$version" || fail "hyperfluxctl doesn't report $version"
 [ "$("$bridge_bin" --version)" = "$version" ] || fail "the bridge doesn't report $version"
 [ "$("$keeper_bin" --version)" = "$version" ] || fail "the keeper doesn't report $version"
+[ "$("$proxy_bin" --version)" = "$version" ] || fail "the proxy doesn't report $version"
+grep -qx "ExecStart=$bridge_bin" "$units/hyperflux-next-bridge.service" || fail "the bridge unit doesn't start $bridge_bin"
+grep -qx "ExecStart=$keeper_bin" "$units/hyperflux-next-keeper.service" || fail "the keeper unit doesn't start $keeper_bin"
+grep -qx "ExecStart=$proxy_bin" "$units/hyperflux-next-client@.service" || fail "the client unit doesn't start $proxy_bin"
 # Names are resolved: this also fails when the group is missing.
 udevadm verify "$rules/99-hyperflux-next.rules" >/dev/null || fail "udevadm rejects 99-hyperflux-next.rules"
 scratch=$(mktemp -d)
@@ -350,7 +372,7 @@ fi
 echo "== Removal"
 remove "${stock[@]}" "${ours[@]}"
 # pacman -Rns may take dkms itself away. Look at what DKMS leaves on disk.
-for path in /usr/lib/hyperflux-next /usr/bin/hyperfluxctl "$rules/99-hyperflux-next.rules" \
+for path in "$libexec" /usr/bin/hyperfluxctl "$rules/99-hyperflux-next.rules" \
     "$units/hyperflux-next-bridge.service" "$units/hyperflux-next-keeper.service" "$full_json" "$plugin" \
     "/usr/src/openrazer-driver-$openrazer" /var/lib/dkms/openrazer-driver; do
     [ ! -e "$path" ] || fail "$path is still there"

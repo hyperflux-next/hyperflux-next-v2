@@ -75,6 +75,12 @@ pub fn fixes(system: &System, findings: &[Finding]) -> Vec<Fix> {
                 &format!("systemctl enable --now {}", paths::BRIDGE_UNIT),
                 None,
             )),
+            ErrorCode::ServiceNotAnswering => Some(make(
+                code,
+                true,
+                &format!("systemctl restart {}", paths::BRIDGE_UNIT),
+                None,
+            )),
             ErrorCode::KeeperDown => Some(make(
                 code,
                 true,

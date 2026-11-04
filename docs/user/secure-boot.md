@@ -34,13 +34,15 @@ computer. You tell the firmware to trust that key once. Doctor reports
 4. Check that the drivers are signed and loaded:
 
    ```sh
-   modinfo -F signer razerkbd
+   /sbin/modinfo -F signer razerkbd
    hyperfluxctl doctor
    ```
 
-   `modinfo` prints the key's name. An empty line means the module is not
-   signed. Reinstall `hyperflux-next-v2-openrazer-driver-dkms` with your
-   package manager, which makes DKMS build and sign it again, and reboot.
+   `modinfo` prints the key's name (the full path is there because Debian
+   and openSUSE leave /sbin off a user's PATH). An empty line means the
+   module is not signed. Reinstall `hyperflux-next-v2-openrazer-driver-dkms`
+   with your package manager, which makes DKMS build and sign it again, and
+   reboot.
 
 The key stays enrolled. Later driver updates are signed with the same key
 and load without another visit to MokManager.
