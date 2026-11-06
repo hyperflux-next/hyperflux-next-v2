@@ -2,6 +2,47 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.4
+
+Fedora 45 came out two days before 1.0.3, and the site had no packages
+for it. Coming from 1.0.2 or older on Fedora or openSUSE, reboot after
+updating: updates don't restart the services.
+
+### Added
+
+- Packages for Fedora 45, next to Fedora 44 until its end of life.
+- `install.sh` reads the site's list of releases, and a new release needs
+  no new script.
+- `hyperfluxctl doctor --fix` restarts `openrazer-daemon` once it stops
+  listing the devices.
+
+### Changed
+
+- Doctor's HFX-404 says which of its four causes it found, and what to
+  do.
+- Fedora's repository file lets dnf carry on when the site lacks a
+  release.
+- The Debian plugin package requires the OpenRGB 1.0 series it was built
+  for.
+- Release files are named by release, such as `fedora-45-` or
+  `ubuntu-26.10-`.
+
+### Fixed
+
+- After upgrading to Fedora 45, dnf skipped the site and got no updates
+  ([#11](https://github.com/hyperflux-next/hyperflux-next-v2/issues/11)).
+- On image-based Fedora 45, such as Bazzite, Core couldn't be layered or
+  updated.
+- `install.sh` needed `awk`, which minimal images such as Tumbleweed's
+  container lack.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.3
 
 With SELinux enforcing, as on Fedora and new Tumbleweed installs, the
