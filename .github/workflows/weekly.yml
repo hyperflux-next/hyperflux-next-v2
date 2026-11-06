@@ -1,8 +1,8 @@
 name: Weekly
 
 # Early warnings about the world moving: new kernels, new distribution
-# images and new OpenRazer releases in the distributions. Nothing here
-# gates a pull request.
+# images, new distribution releases and new OpenRazer releases in the
+# distributions. Nothing here gates a pull request.
 
 on:
   schedule:
@@ -83,13 +83,79 @@ jobs:
           HFX_SOAK_SECS: 1800
         run: cargo test -p hfx-bridge --locked --test soak -- --ignored --nocapture
 
+  # Asks the distributions which releases are current or coming. When
+  # packaging/releases needs a change, a pull request against dev makes it,
+  # or one issue says which (see the step). The issue closes once the list
+  # is right again.
+  releases:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    outputs:
+      builds: ${{ steps.lists.outputs.builds }}
+      next: ${{ steps.lists.outputs.next }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: lists
+        name: What packaging/releases has, and what it lacks
+        # The development releases are tried every week as well: Debian's
+        # unstable gets a new OpenRGB or OpenRazer weeks before testing.
+        run: |
+          echo "builds=$(scripts/releases.py variants --json)" >>"$GITHUB_OUTPUT"
+          scripts/releases.py candidates | jq -c '. + [
+            {variant: "fedora-rawhide", image: "docker.io/library/fedora:rawhide"},
+            {variant: "ubuntu-devel", image: "docker.io/library/ubuntu:devel"},
+            {variant: "debian-sid", image: "docker.io/library/debian:sid"}]' |
+            sed 's/^/next=/' >>"$GITHUB_OUTPUT"
+      # A pull request made with the workflow's own token starts no checks.
+      # This one needs a token of its own, RELEASES_TOKEN
+      # (docs/maintainer/release.md). Without one, the issue says what to do.
+      - name: A pull request with the change, or the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          TITLE: Distribution releases to add or drop
+        run: |
+          status=0
+          report=$(scripts/releases.py check) || status=$?
+          [ "$status" -le 1 ] || exit "$status"
+          issue=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          pr=$(gh pr list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ "$status" = 0 ]; then
+            [ -z "$issue" ] || gh issue close "$issue" --comment "packaging/releases is up to date."
+            exit 0
+          fi
+          note="Found by the weekly workflow (scripts/releases.py check)."
+          if [ -n "$pr" ]; then
+            exit 0
+          elif [ -n "$RELEASES_TOKEN" ]; then
+            scripts/releases.py apply
+            branch=releases/$(date +%F)
+            git switch -q -c "$branch"
+            git add packaging/releases packaging/containers
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -q -m "packaging: follow the distributions' releases"
+            git push -q "https://x-access-token:$RELEASES_TOKEN@github.com/$GITHUB_REPOSITORY.git" "$branch"
+            body=$(printf '%s\n\n%s %s\n' "$report" "$note" "The docs that name the releases still need a person; the tests say where.")
+            GH_TOKEN=$RELEASES_TOKEN gh pr create --base dev --head "$branch" --title "$TITLE" --body "$body"
+          else
+            body=$(printf '%s\n\n%s\n' "$report" "$note")
+            if [ -n "$issue" ]; then gh issue edit "$issue" --body "$body"; else gh issue create --title "$TITLE" --body "$body"; fi
+          fi
+
   distributions:
+    needs: releases
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        target: [arch, ubuntu, debian, fedora, opensuse]
+        build: ${{ fromJSON(needs.releases.outputs.builds) }}
     env:
       HFX_LATEST_IMAGES: 1
     steps:
@@ -98,5 +164,81 @@ jobs:
           persist-credentials: false
       # The install test also fails when the distribution's openrazer-daemon
       # moved past the OpenRazer version our driver package provides.
-      - name: Packages on today's ${{ matrix.target }} image
-        run: scripts/package.sh "${{ matrix.target }}" --install-test
+      - name: Packages on today's ${{ matrix.build }} image
+        run: scripts/package.sh "${{ matrix.build }}" --install-test
+
+  # The live site as users get it: every signature good, the key far from
+  # its expiry date, and the one-line install working on each release.
+  site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Every signature on the live site
+        run: |
+          sudo apt-get install -y -qq rpm >/dev/null
+          git clone -q --depth 1 --branch gh-pages "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" live
+          scripts/repo-verify.sh live
+      # An expired key makes every install and update fail. Extending it
+      # takes a release, which docs/maintainer/signing.md describes.
+      - name: The signing key lasts another six months
+        run: |
+          soon=$(date -d '+6 months' +%s) bad=0
+          while IFS=: read -r kind _ _ _ id _ expires _; do
+            [ "$kind" = pub ] || [ "$kind" = sub ] || continue
+            when=never
+            [ -z "$expires" ] || when=$(date -u -d "@$expires" +%F)
+            echo "$kind $id expires $when"
+            [ -z "$expires" ] || [ "$expires" -ge "$soon" ] || bad=1
+          done < <(gpg --with-colons --show-keys packaging/keys/hyperflux-next-repository-key.asc)
+          exit "$bad"
+
+  site-install:
+    needs: releases
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        build: ${{ fromJSON(needs.releases.outputs.builds) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The README's one line, Core, on ${{ matrix.build }}
+        env:
+          BUILD: ${{ matrix.build }}
+        run: |
+          image=$(sed -n 's/^FROM //p' "packaging/containers/$BUILD.Containerfile" | head -n 1)
+          case $BUILD in
+          arch) prep='pacman-key --init >/dev/null 2>&1' ;;
+          ubuntu-* | debian-*) prep='apt-get update -qq >/dev/null && apt-get install -y -qq curl >/dev/null' ;;
+          opensuse) prep='zypper -q --non-interactive install curl >/dev/null' ;;
+          *) prep=true ;;
+          esac
+          site=$(sed -n 's/^SITE_URL ?= //p' Makefile)
+          want=$(curl -fsSL "$site/VERSION")
+          docker run --rm "$image" bash -c "$prep && curl -fsSL $site/install.sh | sh -s -- --yes --core &&
+            hyperfluxctl --version" | tee out.txt
+          grep -qx "hyperfluxctl (HyperFlux Next V2) $want" out.txt
+
+  # Releases we don't serve yet, built with the newest recipe of their
+  # distribution: a new one is known to work before it goes on the list.
+  next:
+    needs: releases
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.releases.outputs.next) }}
+    env:
+      HFX_FROM: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Packages for ${{ matrix.variant }}
+        run: scripts/package.sh "${{ matrix.variant }}" --install-test

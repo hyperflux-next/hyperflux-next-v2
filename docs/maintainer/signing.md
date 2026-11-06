@@ -34,11 +34,13 @@ changes the files.
 `repo-verify.sh` imports nothing but the public key from the repository,
 into a throwaway keyring and RPM database. Then it checks all the
 signatures, and the checksums the signed indexes vouch for. Run it before
-publishing (`repo-publish.sh` runs it again too).
+publishing (`repo-publish.sh` runs it again too). The weekly workflow runs
+it on the live site.
 
 ## Expiry and rotation
 
-The key has an expiry date, in the table above. Extend it well before it
+The key has an expiry date, in the table above. The weekly workflow fails
+once either key has less than six months left. Extend it well before it
 passes, using the primary key. `gpg --quick-set-expire FINGERPRINT 2y '*'`
 extends the subkeys, and a second run without `'*'` extends the primary
 key. Commit the new public key, publish a release, and tell users to
