@@ -124,6 +124,12 @@ pub fn fixes(system: &System, findings: &[Finding]) -> Vec<Fix> {
                     "systemctl --user enable --now openrazer-daemon.service",
                     None,
                 )),
+                Some("devices missing") => Some(make(
+                    code,
+                    false,
+                    "systemctl --user restart openrazer-daemon.service",
+                    None,
+                )),
                 _ => None,
             },
             _ => None,
