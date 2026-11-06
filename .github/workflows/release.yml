@@ -20,12 +20,26 @@ defaults:
     shell: bash
 
 jobs:
+  builds:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      builds: ${{ steps.builds.outputs.builds }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: builds
+        name: The builds packaging/releases lists
+        run: echo "builds=$(scripts/releases.py variants --json)" >>"$GITHUB_OUTPUT"
+
   packages:
+    needs: builds
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       matrix:
-        target: [arch, ubuntu, debian, fedora, opensuse]
+        build: ${{ fromJSON(needs.builds.outputs.builds) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,12 +48,12 @@ jobs:
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
           [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "tag $GITHUB_REF_NAME, version $version" >&2; exit 1; }
-      - name: Build, lint and install-test the ${{ matrix.target }} packages
-        run: scripts/package.sh "${{ matrix.target }}" --install-test
+      - name: Build, lint and install-test the ${{ matrix.build }} packages
+        run: scripts/package.sh "${{ matrix.build }}" --install-test
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: packages-${{ matrix.target }}
-          path: dist/${{ matrix.target }}/
+          name: packages-${{ matrix.build }}
+          path: dist/${{ matrix.build }}/
 
   site:
     needs: packages
@@ -55,7 +69,7 @@ jobs:
         with:
           pattern: packages-*
           path: dist
-      - name: Name the package directories by target
+      - name: Name the package directories by build
         run: for dir in dist/packages-*; do mv "$dir" "dist/${dir#dist/packages-}"; done
       - name: The published site, to carry its release over
         run: git clone --quiet --depth 1 --branch gh-pages "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" previous || mkdir previous

@@ -7,6 +7,8 @@ import hashlib
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -302,9 +304,17 @@ def test_install_script():
     pinned = re.search(r"(?m)^KEY_SHA256=(\w+)$", script).group(1)
     assert pinned == hashlib.sha256(key.read_bytes()).hexdigest(), "install.sh pins another key file"
     assert f"SITE={makefile_var('SITE_URL')}\n" in script
-    conf = dict(re.findall(r"(?m)^(\w+)=(\S+)$", read("packaging/repository.conf")))
-    for name in ("UBUNTU_SUITE", "UBUNTU_RELEASE", "DEBIAN_SUITE", "DEBIAN_RELEASE", "FEDORA_RELEASE"):
-        assert f"\n{name}={conf[name]}\n" in script, f"install.sh has another {name}"
+    # The releases come from the site's copy of packaging/releases, and
+    # install.sh says them as the site's page does.
+    assert not re.search(r"(?m)^(UBUNTU|DEBIAN|FEDORA)_\w+=", script)
+    functions = "\n".join(re.findall(r"(?ms)^(?:listed|supported)\(\) \{.*?^\}$", script))
+    with tempfile.TemporaryDirectory() as tmp:
+        shutil.copy(ROOT / "packaging/releases", Path(tmp) / "releases")
+        said = subprocess.run(["sh", "-c", f"{functions}\ntmp={tmp}; supported"],
+                              capture_output=True, text=True, check=True).stdout
+    names = subprocess.run([sys.executable, "-I", ROOT / "scripts/releases.py", "names"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    assert said == names
     if shutil.which("gpg"):
         listing = subprocess.run(["gpg", "--batch", "--with-colons", "--show-keys", key],
                                  capture_output=True, text=True, check=True).stdout

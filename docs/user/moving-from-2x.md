@@ -132,9 +132,9 @@ install guide ([Ubuntu](install-apt.md#the-openrgb-page),
 - Arch: `sudo pacman -U ./arch-hyperflux-next-v2-*.pkg.tar.zst`, and
   answer `y` when it asks to remove each conflicting `hyperflux-next-*`
   package
-- Ubuntu: `sudo apt install ./ubuntu-hyperflux-next-v2-*.deb`
-- Debian: `sudo apt install ./debian-hyperflux-next-v2-*.deb`
-- Fedora: `sudo dnf install ./fedora-hyperflux-next-v2-*.rpm`
+- Ubuntu: `sudo apt install ./ubuntu-26.10-hyperflux-next-v2-*.deb`
+- Debian: `sudo apt install ./debian-14-hyperflux-next-v2-*.deb`
+- Fedora: `sudo dnf install ./fedora-$(rpm -E %fedora)-hyperflux-next-v2-*.rpm`
 - openSUSE: `sudo zypper install ./opensuse-hyperflux-next-v2-*.rpm`
 
 The notes on [what Ubuntu and Debian keep](#what-ubuntu-and-debian-keep)

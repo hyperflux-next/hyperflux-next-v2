@@ -1,21 +1,22 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# install-test.sh TARGET VERSION
+# install-test.sh BUILD VERSION
 #
-# Runs as root in a fresh container of TARGET's build image, with the built
-# packages in /dist/TARGET and the source tree in /src. Installs Core and
-# runs the installed bridge and device keeper, each as its own user,
-# against the simulator that package.sh kept from the build (no real
+# Runs as root in a fresh container of BUILD's image (fedora-45, arch), with
+# the built packages in /dist/BUILD and the source tree in /src. Installs
+# Core and runs the installed bridge and device keeper, each as its own
+# user, against the simulator that package.sh kept from the build (no real
 # device is involved). Then installs Full with the distribution's stock
-# OpenRazer on top, checks what users rely on, loads the OpenRGB plugin
-# into the OpenRGB it's built for, and removes everything again. Core has
-# no kernel module. Kernel headers are there for Full's OpenRazer drivers.
+# OpenRazer on top, checks what users rely on, loads the OpenRGB plugin into
+# the OpenRGB it's built for, and removes everything again. Core has no
+# kernel module. Kernel headers are there for Full's OpenRazer drivers.
 # scripts/package.sh starts it.
 
 set -euo pipefail
 
-target=$1 version=$2 pkgs=/dist/$1
+target=${1%%-*} release=${1#"${1%%-*}"} version=$2 pkgs=/dist/$1
+release=${release#-}
 openrazer=3.12.4
 group=plugdev
 stock=(openrazer-daemon python3-openrazer)
@@ -76,7 +77,8 @@ fedora | opensuse)
     if [ "$target" = fedora ]; then
         get() { dnf install -y --setopt=install_weak_deps=False "$@"; }
         remove() { dnf remove -y "$@"; }
-        repos=/etc/yum.repos.d obs=Fedora_44
+        # OpenRazer's own repository, built for each Fedora release.
+        repos=/etc/yum.repos.d obs=Fedora_${release^}
         official=("8c63bf116e21781e9bd92735f766b160c334920279b0700326c08ce19311d56c $hidapi_org/hidapi-hotplug-0.15.0-3.fc43.x86_64.rpm"
             "769a625caf492d8dfdf6b68223c8146ac7bb4ec3bcdafe1c54be39a767f62739 $openrgb_org/openrgb_1.1_x86_64_f44_8e16de2.rpm")
         get kernel-devel

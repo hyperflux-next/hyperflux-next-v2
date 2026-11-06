@@ -2,22 +2,24 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
 # package.sh dist
-# package.sh TARGET [--install-test]
+# package.sh BUILD [--install-test]
 #
-# Builds the packages for TARGET (arch, ubuntu, debian, fedora or
-# opensuse) with the distribution's own recipe, inside its container, from
-# a tarball of the working tree. Lints them with namcap, lintian or rpmlint
-# and leaves them in dist/TARGET/, with the simulator the install test
-# needs in dist/TARGET/test/. --install-test then runs
+# Builds the packages for BUILD, a line of packaging/releases such as arch
+# or fedora-45, with the distribution's own recipe, inside its container,
+# from a tarball of the working tree. Lints them with namcap, lintian or
+# rpmlint and leaves them in dist/BUILD/, with the simulator the install
+# test needs in dist/BUILD/test/. --install-test then runs
 # scripts/install-test.sh in a fresh container of the same image.
 #
 # CONTAINER_ENGINE picks podman or docker (default: whichever exists).
 # HFX_LATEST_IMAGES=1 builds on the newest image instead of the pinned one.
+# HFX_FROM=IMAGE builds a release the list doesn't have yet (fedora-46,
+# debian-sid) on IMAGE, with the newest recipe of its distribution.
 
 set -euo pipefail
 
 inside() {
-    local target=$1 version=$2 out=/dist/$1 src=hyperflux-next-v2-$2
+    local target=${1%%-*} version=$2 out=/dist/$1 src=hyperflux-next-v2-$2
     local tarball=/dist/hyperflux-next-v2-$version.tar.gz
     mkdir -p /build "$out"
     cd /build
@@ -88,7 +90,7 @@ fi
 cd "$(dirname "$0")/.."
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
 tarball=dist/hyperflux-next-v2-$version.tar.gz
-target=${1:?usage: package.sh dist | package.sh TARGET [--install-test]}
+build=${1:?usage: package.sh dist | package.sh BUILD [--install-test]}
 
 # Tracked and new files, as GitHub's archive of the tag would have them.
 mkdir -p dist
@@ -100,24 +102,29 @@ git ls-files -z --cached --others --exclude-standard |
 # Renamed into place: a build of another target that is reading it never
 # sees a half-written file.
 mv "$tarball.$$" "$tarball"
-[ "$target" = dist ] && { echo "$tarball"; exit; }
+[ "$build" = dist ] && { echo "$tarball"; exit; }
 
-containerfile=packaging/containers/$target.Containerfile
-[ -f "$containerfile" ] || { echo "package.sh: unknown target $target" >&2; exit 2; }
+containerfile=packaging/containers/$build.Containerfile
+if [ -n "${HFX_FROM:-}" ]; then
+    containerfile=$(find packaging/containers -name "${build%%-*}*.Containerfile" | sort -V | tail -n 1)
+fi
+[ -f "$containerfile" ] || { echo "package.sh: $build isn't in packaging/releases" >&2; exit 2; }
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
-image=hyperflux-next-build:$target
-if [ "${HFX_LATEST_IMAGES:-}" = 1 ]; then
+image=hyperflux-next-build:$build
+if [ -n "${HFX_FROM:-}" ]; then
+    sed "1s|^FROM .*|FROM $HFX_FROM|" "$containerfile" | "$engine" build -t "$image" -f - packaging/containers
+elif [ "${HFX_LATEST_IMAGES:-}" = 1 ]; then
     sed 's/@sha256:[0-9a-f]*//' "$containerfile" | "$engine" build -t "$image" -f - packaging/containers
 else
     "$engine" build -t "$image" -f "$containerfile" packaging/containers
 fi
 
-rm -rf "dist/$target"
+rm -rf "dist/$build"
 run() { "$engine" run --rm -v "$PWD:/src:ro" -v "$PWD/dist:/dist" "$image" "$@"; }
-run bash /src/scripts/package.sh --inside "$target" "$version"
+run bash /src/scripts/package.sh --inside "$build" "$version"
 if [ "${2:-}" = --install-test ]; then
-    run bash /src/scripts/install-test.sh "$target" "$version"
+    run bash /src/scripts/install-test.sh "$build" "$version"
 fi
 # Docker leaves root-owned files behind, but podman maps them to this user.
-[ -O "dist/$target" ] || run chown -R "$(id -u):$(id -g)" "/dist/$target"
-ls -l "dist/$target"
+[ -O "dist/$build" ] || run chown -R "$(id -u):$(id -g)" "/dist/$build"
+ls -l "dist/$build"

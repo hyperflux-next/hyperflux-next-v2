@@ -73,7 +73,7 @@ The plugin package is built for a different OpenRGB on each distribution:
 | Arch | Arch's OpenRGB 1.1, Qt 6 | optional | depends on it |
 | Debian | Debian's OpenRGB 1.0, Qt 5 | depends on `openrgb (>= 1.0), (<< 1.1~)` | depends on it |
 | Ubuntu | openrgb.org's 1.1 Trixie package, Qt 6 | depends on `openrgb (>= 1.1), (<< 1.2~)` | recommends it |
-| Fedora | openrgb.org's 1.1 Fedora 44 package, Qt 6 | requires `openrgb >= 1.1` and `< 1.2~` | recommends it |
+| Fedora | openrgb.org's 1.1 Fedora 44 package (on 44 and 45), Qt 6 | requires `openrgb >= 1.1` and `< 1.2~` | recommends it |
 | openSUSE | not built | | |
 
 On Ubuntu and Debian, `debian/rules` asks apt which OpenRGB the release
@@ -1105,7 +1105,7 @@ Line budgets per part:
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |
 | Python SDK | 600 |
-| scripts and packaging | 2,200 |
+| scripts and packaging | 2,400 |
 | total | 40,000 |
 
 `scripts/loc-check.sh` counts the lines in CI. The run fails when a part

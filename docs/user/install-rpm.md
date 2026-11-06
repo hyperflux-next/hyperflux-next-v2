@@ -1,12 +1,14 @@
 # Install on Fedora or openSUSE
 
-The packages are built for Fedora 44 and openSUSE Tumbleweed on x86_64.
+The packages are built for Fedora 44 and 45, and openSUSE Tumbleweed, on
+x86_64.
 Full works with OpenRazer apps such as Polychromatic. Neither
 distribution ships an OpenRGB that can load the HyperFlux Next V2 plugin
 (both package a 1.0 release candidate), but on Fedora, OpenRGB 1.1 from
 openrgb.org can, as [the OpenRGB page](#the-openrgb-page) shows.
 
-Distributions based on Fedora 44 or Tumbleweed can use the same packages.
+Distributions based on Fedora 44, 45 or Tumbleweed can use the same
+packages.
 On image-based ones, such as Bazzite or openSUSE Aeon, you can layer Core
 but not Full: see [image-based systems](#image-based-systems).
 
@@ -173,6 +175,15 @@ sudo systemctl enable hyperflux-next-bridge.service "hyperflux-next-client@$(id 
 sudo reboot
 ```
 
+A layered package must exist for the new release when the system moves to
+one, or the whole update stops. The site has packages for each new Fedora
+before it is released. If an update still stops on
+`hyperflux-next-v2-linux`, take it off, update, and layer it again later:
+
+```sh
+sudo rpm-ostree uninstall hyperflux-next-v2-linux
+```
+
 `--apply-live` makes Core usable at once, and its units can be enabled
 before the reboot.
 
@@ -207,7 +218,7 @@ Build Service:
 
 ```sh
 # Fedora
-sudo dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/hardware:/razer/Fedora_44/hardware:razer.repo
+sudo dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/hardware:/razer/Fedora_$(rpm -E %fedora)/hardware:razer.repo
 sudo dnf install openrazer-daemon python3-openrazer polychromatic
 
 # openSUSE
@@ -229,8 +240,8 @@ On Fedora it needs OpenRGB 1.1 from
 [openrgb.org](https://openrgb.org/releases.html). Get the Fedora 44
 package, `openrgb_1.1_x86_64_f44_8e16de2.rpm`, and the hidapi-hotplug
 package that the page links to, `hidapi-hotplug-0.15.0-3.fc43.x86_64.rpm`.
-That one is a Fedora 43 build and works on 44. In the folder you saved
-them to, run:
+Both are builds for older Fedora releases and work on 44 and 45. In the
+folder you saved them to, run:
 
 ```sh
 sudo dnf install ./hidapi-hotplug-0.15.0-3.fc43.x86_64.rpm ./openrgb_1.1_x86_64_f44_8e16de2.rpm

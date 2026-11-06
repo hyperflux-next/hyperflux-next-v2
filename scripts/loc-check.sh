@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 # Raise one only with the change that needs it, after trimming what can go.
 declare -A budget=(
     [hfx-proto]=5000 [hfx-bridge]=16000 [hyperfluxctl]=9000
-    [openrgb-plugin+cpp-sdk]=6000 [python-sdk]=600 [scripts+packaging]=2200
+    [openrgb-plugin+cpp-sdk]=6000 [python-sdk]=600 [scripts+packaging]=2400
 )
 total_budget=40000
 declare -A lines

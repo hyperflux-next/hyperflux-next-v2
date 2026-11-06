@@ -7,6 +7,7 @@ side fails here until the other side says the same."""
 import re
 import shutil
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -145,24 +146,28 @@ def test_openrazer_versions():
 
 
 def test_releases():
-    conf = assignments("packaging/repository.conf")
-    ubuntu, debian, fedora = conf["UBUNTU_RELEASE"], conf["DEBIAN_RELEASE"], conf["FEDORA_RELEASE"]
+    served = {}
+    for line in read("packaging/releases").splitlines():
+        if line.strip() and not line.startswith("#"):
+            target, release, suite = line.split()
+            served.setdefault(target, {})[release] = suite
     # The unsupported releases the docs name on purpose.
-    allowed = {"Ubuntu": {ubuntu, "26.04"}, "Debian": {debian, "13"}, "Fedora": {fedora, "43"}}
+    allowed = {"Ubuntu": {*served["ubuntu"], "26.04"}, "Debian": {*served["debian"], "13"},
+               "Fedora": {*served["fedora"], "43"}}
     for doc in USER_DOCS:
         text = read(doc)
         for name, versions in allowed.items():
             for version in re.findall(rf"\b{name}\s+(\d+(?:\.\d+)?)\b", text):
                 assert version in versions, f"{doc} names {name} {version}"
         for version, suite in re.findall(r"\bUbuntu\s+(\d\d\.\d\d)\s+\((\w+)\)", text):
-            assert (version, suite) == (ubuntu, conf["UBUNTU_SUITE"]), doc
+            assert served["ubuntu"].get(version) == suite, doc
         for version, suite in re.findall(r"\bDebian\s+(\d+)\s+\((\w+)\)", text):
-            assert version != debian or suite == conf["DEBIAN_SUITE"], doc
+            assert version not in served["debian"] or served["debian"][version] == suite, doc
         for version in re.findall(r"Ubuntu supports (\d\d\.\d\d) until", text):
-            assert version == ubuntu, f"{doc}: the support date belongs to Ubuntu {version}"
-    readme = read("README.md")
-    for release in (f"Ubuntu {ubuntu}", f"Debian {debian}", f"Fedora {fedora}"):
-        assert release in readme, release
+            assert version in served["ubuntu"], f"{doc}: the support date belongs to Ubuntu {version}"
+    names = subprocess.run([sys.executable, "-I", ROOT / "scripts/releases.py", "names"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    assert names in " ".join(read("README.md").split()), "README doesn't list the releases packaging/releases has"
 
 
 def test_openrgb():
