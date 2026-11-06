@@ -71,10 +71,17 @@ The plugin package is built for a different OpenRGB on each distribution:
 | Distribution | Built for | Relation to OpenRGB | Full |
 | --- | --- | --- | --- |
 | Arch | Arch's OpenRGB 1.1, Qt 6 | optional | depends on it |
-| Debian | Debian's OpenRGB 1.0, Qt 5 | enhances | depends on it |
+| Debian | Debian's OpenRGB 1.0, Qt 5 | depends on `openrgb (>= 1.0), (<< 1.1~)` | depends on it |
 | Ubuntu | openrgb.org's 1.1 Trixie package, Qt 6 | depends on `openrgb (>= 1.1), (<< 1.2~)` | recommends it |
 | Fedora | openrgb.org's 1.1 Fedora 44 package, Qt 6 | requires `openrgb >= 1.1` and `< 1.2~` | recommends it |
 | openSUSE | not built | | |
+
+On Ubuntu and Debian, `debian/rules` asks apt which OpenRGB the release
+has and builds for it. That's a 1.0 with Qt 5 or a 1.1 with Qt 6, which
+Full then depends on, or openrgb.org's 1.1 where the release's own is
+older.
+Any other OpenRGB stops the build until `integrations/openrgb/PIN` has a
+tree for it. The weekly build on Debian unstable meets a new one first.
 
 The openrgb.org packages link the distribution's own Qt 6. That's why a
 plugin built against that Qt loads in them but not in their Flatpak (KDE

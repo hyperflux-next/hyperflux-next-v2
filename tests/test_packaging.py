@@ -86,8 +86,10 @@ def test_openrgb_plugin_package():
     full = pkgbuild.split("package_hyperflux-next-v2-full() {", 1)[1].split("\n}", 1)[0]
     assert '"hyperflux-next-v2-openrgb-plugin=$pkgver-$pkgrel"' in full
     rules = read("packaging/debian/rules")
-    assert "hfx:Full-Depends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))" in rules
-    assert "hfx:Full-Recommends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))" in rules
+    assert "PLUGIN := hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))" in rules
+    assert "hfx:Full-Depends=$(PLUGIN)" in rules and "hfx:Full-Recommends=$(PLUGIN)" in rules
+    # The plugin needs the OpenRGB series it was built for: Debian's 1.0, or a 1.1.
+    assert "hfx:OpenRGB=openrgb (>= 1.0), openrgb (<< 1.1~)" in rules
     assert "hfx:OpenRGB=openrgb (>= 1.1), openrgb (<< 1.2~)" in rules
     assert re.search(r"(?m)^Recommends:\s+hyperflux-next-v2-openrgb-plugin = %\{version\}-%\{release\}$", spec)
     assert re.search(r"(?m)^Requires:\s+\(openrgb >= 1\.1 with openrgb < 1\.2~\)$", spec)
