@@ -285,7 +285,11 @@ main() {
     # Fedora and openSUSE layer packages, and Core layers, as it adds no
     # kernel module. DKMS can't build Full's drivers into a read-only /usr.
     layer=
-    case $(awk '$2 == "/" || $2 == "/usr" {o = $4} END {print o}' /proc/mounts) in
+    mounted=
+    while read -r _ dir _ opts _; do
+        case $dir in / | /usr) mounted=$opts ;; esac
+    done </proc/mounts
+    case $mounted in
     ro*)
         if [ "$target" = fedora ] && [ -e /run/ostree-booted ]; then
             layer=rpm-ostree
@@ -321,6 +325,8 @@ main() {
 
     echo
     echo "HyperFlux Next V2 is installed. Reboot to finish, then run: hyperfluxctl doctor"
+    # Plain sh reads the list: minimal images such as Tumbleweed's container
+    # have no awk.
     if [ -z "$yes" ]; then
         printf 'Reboot now? [y/N] '
         read -r answer </dev/tty || answer=
