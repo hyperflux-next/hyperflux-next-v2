@@ -70,8 +70,8 @@ patched_modules = ["razerkbd", "razermouse"]
 # Phantom Green Edition is counted with it.
 [sources.razer-hyperflux-v2]
 url = "https://www.razer.com/gaming-mouse-mats/razer-hyperflux-v2-wireless-charging-system"
-seen = "2026-10-24"
-lists = { "Naga V3 Pro" = [0x00e8], "Basilisk V3 Pro 35K" = [0x00cd, 0x00d7], "Basilisk V3 Pro" = [0x00ab], "Cobra Pro" = [0x00b0], "Cobra HyperSpeed" = [0x00db], "Naga V2 Pro" = [0x00a8], "DeathStalker V2 Pro" = [0x0290], "DeathStalker V2 Pro Tenkeyless" = [0x0296], "BlackWidow V4 Tenkeyless HyperSpeed" = [0x02d5], "BlackWidow V4 Low-Profile HyperSpeed" = [0x02c9], "BlackWidow V4 Low-Profile Tenkeyless HyperSpeed" = [0x02d2], "BlackWidow V4 Mini HyperSpeed" = [0x02ba], "BlackWidow V3 Pro" = [0x025c] }
+seen = "2026-11-06"
+lists = { "Basilisk V4 Pro" = [0x00e3], "Basilisk V4 HyperSpeed" = [0x00ea], "Naga V3 Pro" = [0x00e8], "Basilisk V3 Pro 35K" = [0x00cd, 0x00d7], "Basilisk V3 Pro" = [0x00ab], "Cobra Pro" = [0x00b0], "Cobra HyperSpeed" = [0x00db], "Naga V2 Pro" = [0x00a8], "DeathStalker V2 Pro" = [0x0290], "DeathStalker V2 Pro Tenkeyless" = [0x0296], "BlackWidow V4 Tenkeyless HyperSpeed" = [0x02d5], "BlackWidow V4 Low-Profile HyperSpeed" = [0x02c9], "BlackWidow V4 Low-Profile Tenkeyless HyperSpeed" = [0x02d2], "BlackWidow V4 Mini HyperSpeed" = [0x02ba], "BlackWidow V3 Pro" = [0x025c] }
 
 [sources.razer-hyperflux-v2-launch]
 url = "https://www.razer.com/newsroom/product-news/razer-hyperflux-v2-wireless-charging-system"

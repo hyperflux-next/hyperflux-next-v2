@@ -13,7 +13,11 @@ permissions:
 
 jobs:
   merge:
-    if: github.event.pull_request.user.login == 'dependabot[bot]' && !github.event.repository.private
+    # Only Dependabot's own pushes. fetch-metadata refuses a commit a person
+    # rebased or pushed, and the job would fail instead of being skipped.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.actor == 'dependabot[bot]' && !github.event.repository.private
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -23,8 +27,25 @@ jobs:
       - id: update
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
       - name: Merge once the checks pass
-        if: steps.update.outputs.update-type != 'version-update:semver-major'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR"
+          ECOSYSTEM: ${{ steps.update.outputs.package-ecosystem }}
+          UPDATE: ${{ steps.update.outputs.update-type }}
+        run: |
+          # fetch-metadata compares a pinned image's old digest with its tag
+          # name and calls every digest bump semver-major. One that keeps
+          # each image and tag and only moves the digest is small.
+          if [ "$ECOSYSTEM" = docker ]; then
+            diff=$(gh pr diff "$PR" | grep -E '^[-+]' | grep -vE '^(---|\+\+\+) ' || true)
+            other=$(printf '%s\n' "$diff" | grep -vE '^[-+]FROM ' || true)
+            moved=$(printf '%s\n' "$diff" | sed -E 's/^[-+]//; s/@sha256:[0-9a-f]+//' | sort | uniq -u)
+            if [ -n "$other" ] || [ -n "$moved" ]; then
+              echo "Changes more than a digest; leaving it for review."
+              exit 0
+            fi
+          elif [ "$UPDATE" = version-update:semver-major ]; then
+            echo "A major update; leaving it for review."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR"

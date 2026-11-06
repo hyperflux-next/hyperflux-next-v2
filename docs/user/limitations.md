@@ -41,12 +41,12 @@ major version, or is older than the Qt the plugin was built with.
   will not load it, because the Debian plugin is built for 1.0 with Qt 5.
 - Ubuntu: OpenRGB 1.1 from openrgb.org (the Debian Trixie package), with
   the separate `hyperflux-next-v2-openrgb-plugin`.
-- Fedora: OpenRGB 1.1 from openrgb.org (the Fedora 44 package), with the
-  separate `hyperflux-next-v2-openrgb-plugin`.
+- Fedora: OpenRGB 1.1 from openrgb.org (its Fedora 44 package, on 44 and
+  45), with the separate `hyperflux-next-v2-openrgb-plugin`.
 - openSUSE: none.
 
 Ubuntu 26.10 packages an OpenRGB snapshot from before 1.0. Fedora 44 and
-openSUSE Tumbleweed have a 1.0 release candidate. Those load plugins for
+45 and openSUSE Tumbleweed have a 1.0 release candidate. Those load plugins for
 OpenRGB's older plugin interface and no others. On openSUSE the Fedora
 package from openrgb.org fails to install, because it asks for libraries
 by Fedora's package names.

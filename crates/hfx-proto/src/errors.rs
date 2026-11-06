@@ -369,8 +369,8 @@ pub const CATALOG: &[CatalogEntry] = &[
         "HFX-404",
         E,
         "OpenRazer isn't ready for this login.",
-        "This login isn't in the {group} group yet, openrazer-daemon isn't on the session bus, or it hasn't listed every device HyperFlux Next V2 offers it.",
-        "Run: sudo gpasswd -a \"$USER\" {group}, log out and back in, and check that openrazer-daemon runs (systemctl --user status openrazer-daemon).",
+        "{why}",
+        "{remedy}",
         "As your normal user, run hyperfluxctl doctor and check that OpenRazer is ready.",
     ),
     entry(

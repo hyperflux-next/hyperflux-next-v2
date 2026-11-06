@@ -490,28 +490,40 @@ in [HFX-402](#hfx-402).
 
 ### HFX-404
 
-Doctor says "OpenRazer isn't ready for this login." That has one of three
-causes:
+Doctor says "OpenRazer isn't ready for this login." The next line says
+which of these it found:
 
 - your user is not in the OpenRazer group yet
 - `openrazer-daemon` is not running
-- the daemon has not listed every device the bridge created for it
+- the daemon runs but has not listed every device the bridge created for
+  it
+- Doctor couldn't ask your session bus at all (over SSH, for example)
 
 A device that is asleep or out of range is not part of this check.
 OpenRazer gets it once it answers. Until then Doctor just notes that it
 is waiting for it. If the bridge itself failed to create a device, you get
 [HFX-207](#hfx-207) instead.
 
-Join the group Doctor names (`openrazer` on Arch, `plugdev` elsewhere),
-log out and back in, and check the daemon:
+Not in the group: join the one Doctor names (`openrazer` on Arch,
+`plugdev` elsewhere), then log out and back in.
 
 ```sh
 sudo gpasswd -a "$USER" openrazer   # Arch
 sudo gpasswd -a "$USER" plugdev     # Ubuntu, Debian, Fedora, openSUSE
-systemctl --user status openrazer-daemon
 ```
 
-Run Doctor as your normal user, not with `sudo`.
+The daemon not running, or not listing a device: start it, or restart it.
+OpenRazer 3.12.4's daemon stops taking new devices for good once a device
+it was adding disappears within two seconds, which a quick replug can do.
+A restart brings them back.
+
+```sh
+systemctl --user enable --now openrazer-daemon.service
+systemctl --user restart openrazer-daemon.service
+```
+
+`hyperfluxctl doctor --fix` offers the right one. Run Doctor as your
+normal user, in your desktop session, not with `sudo`.
 
 ### HFX-405
 

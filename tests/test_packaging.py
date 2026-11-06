@@ -7,6 +7,8 @@ import hashlib
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -86,8 +88,10 @@ def test_openrgb_plugin_package():
     full = pkgbuild.split("package_hyperflux-next-v2-full() {", 1)[1].split("\n}", 1)[0]
     assert '"hyperflux-next-v2-openrgb-plugin=$pkgver-$pkgrel"' in full
     rules = read("packaging/debian/rules")
-    assert "hfx:Full-Depends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))" in rules
-    assert "hfx:Full-Recommends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))" in rules
+    assert "PLUGIN := hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))" in rules
+    assert "hfx:Full-Depends=$(PLUGIN)" in rules and "hfx:Full-Recommends=$(PLUGIN)" in rules
+    # The plugin needs the OpenRGB series it was built for: Debian's 1.0, or a 1.1.
+    assert "hfx:OpenRGB=openrgb (>= 1.0), openrgb (<< 1.1~)" in rules
     assert "hfx:OpenRGB=openrgb (>= 1.1), openrgb (<< 1.2~)" in rules
     assert re.search(r"(?m)^Recommends:\s+hyperflux-next-v2-openrgb-plugin = %\{version\}-%\{release\}$", spec)
     assert re.search(r"(?m)^Requires:\s+\(openrgb >= 1\.1 with openrgb < 1\.2~\)$", spec)
@@ -300,9 +304,17 @@ def test_install_script():
     pinned = re.search(r"(?m)^KEY_SHA256=(\w+)$", script).group(1)
     assert pinned == hashlib.sha256(key.read_bytes()).hexdigest(), "install.sh pins another key file"
     assert f"SITE={makefile_var('SITE_URL')}\n" in script
-    conf = dict(re.findall(r"(?m)^(\w+)=(\S+)$", read("packaging/repository.conf")))
-    for name in ("UBUNTU_SUITE", "UBUNTU_RELEASE", "DEBIAN_SUITE", "DEBIAN_RELEASE", "FEDORA_RELEASE"):
-        assert f"\n{name}={conf[name]}\n" in script, f"install.sh has another {name}"
+    # The releases come from the site's copy of packaging/releases, and
+    # install.sh says them as the site's page does.
+    assert not re.search(r"(?m)^(UBUNTU|DEBIAN|FEDORA)_\w+=", script)
+    functions = "\n".join(re.findall(r"(?ms)^(?:listed|supported)\(\) \{.*?^\}$", script))
+    with tempfile.TemporaryDirectory() as tmp:
+        shutil.copy(ROOT / "packaging/releases", Path(tmp) / "releases")
+        said = subprocess.run(["sh", "-c", f"{functions}\ntmp={tmp}; supported"],
+                              capture_output=True, text=True, check=True).stdout
+    names = subprocess.run([sys.executable, "-I", ROOT / "scripts/releases.py", "names"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    assert said == names
     if shutil.which("gpg"):
         listing = subprocess.run(["gpg", "--batch", "--with-colons", "--show-keys", key],
                                  capture_output=True, text=True, check=True).stdout
