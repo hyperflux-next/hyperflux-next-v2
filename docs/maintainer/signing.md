@@ -37,6 +37,14 @@ signatures, and the checksums the signed indexes vouch for. Run it before
 publishing (`repo-publish.sh` runs it again too). The weekly workflow runs
 it on the live site.
 
+The release workflow also records each package's build provenance with
+GitHub: a signed statement of the workflow run and commit that built the
+file. `gh attestation verify FILE --repo hyperflux-next/hyperflux-next-v2`
+checks a release file against it. That holds for the Arch, Ubuntu and
+Debian files as published. `rpmsign` adds the signature to an RPM after
+the build, which changes its bytes. An RPM's record is for the file before
+signing. For RPMs, `rpm -K` and the project key are the check.
+
 ## Expiry and rotation
 
 The key has an expiry date, in the table above. The weekly workflow fails
