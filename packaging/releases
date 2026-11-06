@@ -1,0 +1,14 @@
+# The distribution releases the package repository serves, one per line:
+# the packaging target, the release and, for APT, the suite. "-" means none:
+# Arch and Tumbleweed roll. Each line is a build, named TARGET-RELEASE (or
+# TARGET when it rolls), with its own image in packaging/containers/.
+#
+# The builds, the site, the docs' tests and, through the site's copy,
+# install.sh read this file. scripts/releases.py checks it against the
+# distributions' own lists every week.
+arch      -      -
+ubuntu    26.10  stonking
+debian    14     forky
+fedora    44     -
+fedora    45     -
+opensuse  -      -

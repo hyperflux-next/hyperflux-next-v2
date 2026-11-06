@@ -3,7 +3,8 @@
 # System files of the linux, full and openrgb-plugin packages, package
 # builds and the package repository. Paths come from the top-level Makefile.
 
-PACKAGE_TARGETS := arch ubuntu debian fedora opensuse
+# One build per line of packaging/releases: arch, fedora-45, ...
+PACKAGE_TARGETS := $(shell python3 -I scripts/releases.py variants)
 
 .PHONY: install-linux-files install-full-files install-openrgb-plugin-files crate-notices dist \
 	lint-packaging $(addprefix package-,$(PACKAGE_TARGETS)) \

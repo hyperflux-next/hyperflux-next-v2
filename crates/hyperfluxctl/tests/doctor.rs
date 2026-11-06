@@ -744,6 +744,11 @@ fn openrazer_access() {
         ),
         (Some("HFX-404"), Some("1532:00cd"))
     );
+    // A daemon that runs but lists nothing new needs a restart, not the group.
+    assert_eq!(
+        finding["details"]["remedy"],
+        "Restart it: systemctl --user restart openrazer-daemon.service"
+    );
 }
 
 #[test]

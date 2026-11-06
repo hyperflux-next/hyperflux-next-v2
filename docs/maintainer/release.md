@@ -35,10 +35,36 @@ release, the weekly workflow fails its install tests. Update the OpenRazer
 pin and the patch, and the versions the driver package provides, then
 release a new version.
 
+`packaging/releases` lists the distribution releases the site serves.
+Every week, `scripts/releases.py check` asks the distributions what is
+current and what's coming. It counts a Fedora release from the day it
+branches, an Ubuntu one from about six weeks before its release date, and
+Debian's testing release. The same run builds and install-tests each
+missing release, plus Fedora Rawhide, the Ubuntu in development and
+Debian unstable. A new release is known to work before it goes on the
+list.
+
+When the list needs a change, the weekly workflow opens a pull request
+against `dev`, "Distribution releases to add or drop". It holds what
+`scripts/releases.py apply` changed: the list's lines and, for a new
+release, a `packaging/containers/BUILD.Containerfile`. That one is copied
+from its distribution's newest, with the new image pinned by digest.
+Dependabot keeps the digest current. The docs are yours.
+`tests/test_docs.py` fails until they name the right releases. Fix them on
+the branch and merge. Then release as above.
+
+The pull request needs a token of its own. One made with the workflow's
+own token starts no checks. Make a fine-grained personal access token for
+this repository only, with read and write access to contents and pull
+requests. Save it as the repository secret `RELEASES_TOKEN`. Without it,
+the workflow opens an issue with the same title. Then run
+`scripts/releases.py apply` yourself.
+
 Dependabot opens its updates against `dev` on Mondays: the GitHub Actions,
 the crates and the build images, one pull request each. An update within
 the same major version merges itself once every check `dev` requires has
-passed (`.github/workflows/dependabot-merge.yml`). A major one waits for
-review. They reach `main` with the next release. The automatic merge
-needs `dev` to require those checks, which a free plan allows for a
-public repository but not a private one.
+passed (`.github/workflows/dependabot-merge.yml`). A new digest for the
+same image and tag does too. A major one waits for review. They
+reach `main` with the next release. The automatic merge needs `dev` to
+require those checks, which a free plan allows for a public repository
+but not a private one.

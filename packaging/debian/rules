@@ -3,18 +3,29 @@
 
 include /usr/share/dpkg/pkg-info.mk
 
-# Debian's own OpenRGB 1.0 loads the plugin when it's built against Qt 5,
-# so Full depends on the plugin package. Ubuntu's OpenRGB is a snapshot
-# from before 1.0. There the plugin is built for OpenRGB 1.1 from
-# openrgb.org, whose trixie package runs on Ubuntu's own Qt 6. The plugin
-# package depends on that OpenRGB, and Full only recommends it.
-ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo yes),yes)
-QT := 6
-RELATIONS := -V'hfx:OpenRGB=openrgb (>= 1.1), openrgb (<< 1.2~)' \
-	-V'hfx:Full-Recommends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))'
-else
+# The plugin is built for the OpenRGB this release has, when we pin that
+# one: 1.0 with Qt 5, as Debian has it, or 1.1 with Qt 6. Full then depends
+# on the plugin. Ubuntu's own OpenRGB is a snapshot from before 1.0. There
+# the plugin is built for OpenRGB 1.1 from openrgb.org, whose trixie
+# package runs on Ubuntu's own Qt 6, and Full only recommends it. Any other
+# OpenRGB stops the build: it needs a new pin in integrations/openrgb/PIN.
+OPENRGB := $(shell apt-cache show --no-all-versions openrgb 2>/dev/null | sed -n 's/^Version: //p')
+OPENRGB_LIB := $(shell apt-cache show --no-all-versions openrgb 2>/dev/null | grep -o 'libqt[56]' | head -n 1)
+OPENRGB_SERIES := $(shell echo '$(OPENRGB)' | sed -n 's/^\([0-9]*\.[0-9]*\).*/\1/p')
+PLUGIN := hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))
+ifeq ($(OPENRGB),)
+$(error apt doesn't know this release's openrgb package; run apt-get update first)
+else ifeq ($(OPENRGB_SERIES) $(OPENRGB_LIB),1.0 libqt5)
 QT := 5
-RELATIONS := -V'hfx:Full-Depends=hyperflux-next-v2-openrgb-plugin (= $(DEB_VERSION))'
+RELATIONS := -V'hfx:OpenRGB=openrgb (>= 1.0), openrgb (<< 1.1~)' -V'hfx:Full-Depends=$(PLUGIN)'
+else ifeq ($(OPENRGB_SERIES) $(OPENRGB_LIB),1.1 libqt6)
+QT := 6
+RELATIONS := -V'hfx:OpenRGB=openrgb (>= 1.1), openrgb (<< 1.2~)' -V'hfx:Full-Depends=$(PLUGIN)'
+else ifeq ($(shell dpkg --compare-versions '$(OPENRGB)' lt 1.0~ && echo older),older)
+QT := 6
+RELATIONS := -V'hfx:OpenRGB=openrgb (>= 1.1), openrgb (<< 1.2~)' -V'hfx:Full-Recommends=$(PLUGIN)'
+else
+$(error OpenRGB $(OPENRGB) ($(OPENRGB_LIB)) has no pinned tree to build the plugin against)
 endif
 
 HFX_MAKE := $(MAKE) OPENRAZER_GROUP=plugdev OPENRGB_QT=$(QT)

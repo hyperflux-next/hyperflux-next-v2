@@ -34,11 +34,21 @@ changes the files.
 `repo-verify.sh` imports nothing but the public key from the repository,
 into a throwaway keyring and RPM database. Then it checks all the
 signatures, and the checksums the signed indexes vouch for. Run it before
-publishing (`repo-publish.sh` runs it again too).
+publishing (`repo-publish.sh` runs it again too). The weekly workflow runs
+it on the live site.
+
+The release workflow also records each package's build provenance with
+GitHub: a signed statement of the workflow run and commit that built the
+file. `gh attestation verify FILE --repo hyperflux-next/hyperflux-next-v2`
+checks a release file against it. That holds for the Arch, Ubuntu and
+Debian files as published. `rpmsign` adds the signature to an RPM after
+the build, which changes its bytes. An RPM's record is for the file before
+signing. For RPMs, `rpm -K` and the project key are the check.
 
 ## Expiry and rotation
 
-The key has an expiry date, in the table above. Extend it well before it
+The key has an expiry date, in the table above. The weekly workflow fails
+once either key has less than six months left. Extend it well before it
 passes, using the primary key. `gpg --quick-set-expire FINGERPRINT 2y '*'`
 extends the subkeys, and a second run without `'*'` extends the primary
 key. Commit the new public key, publish a release, and tell users to

@@ -28,7 +28,9 @@ gpg --batch --with-colons --show-keys "$KEY_FILE" | grep -q "^fpr:*:$SIGNING_KEY
 sign() { gpg --batch --yes --local-user "$SIGNING_KEY!" --digest-algo SHA512 "$@"; }
 
 echo "== RPM"
-"$engine" build -q -t hyperflux-next-build:fedora -f packaging/containers/fedora.Containerfile packaging/containers >/dev/null
+# createrepo_c from the newest Fedora image signs both distributions' metadata.
+fedora=$(find packaging/containers -name 'fedora-*.Containerfile' | sort -V | tail -n 1)
+"$engine" build -q -t hyperflux-next-build:fedora -f "$fedora" packaging/containers >/dev/null
 for dir in "$site"/fedora/*/x86_64 "$site"/opensuse/*/x86_64; do
     rpmsign --addsign --define "_gpg_name $SIGNING_KEY!" --define '_gpg_digest_algo sha512' "$dir"/packages/*.rpm
     target=${dir#"$site"/}

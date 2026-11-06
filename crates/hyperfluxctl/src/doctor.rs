@@ -1493,6 +1493,35 @@ fn blocking_module(modules: &[Module]) -> Option<(ErrorCode, &'static str, &'sta
         .map(|m| (NotActive, m.name, "older copy loaded"))
 }
 
+/// HFX-404's cause and advice for each way OpenRazer can be unready.
+fn openrazer_advice(state: &str, missing: &str) -> (String, String) {
+    match state {
+        "not a member" => (
+            format!("This login isn't in the {OPENRAZER_GROUP} group yet."),
+            format!("Run: sudo gpasswd -a \"$USER\" {OPENRAZER_GROUP}, then log out and back in."),
+        ),
+        "daemon not running" => (
+            "openrazer-daemon isn't running for this login.".into(),
+            "Start it: systemctl --user enable --now openrazer-daemon.service".into(),
+        ),
+        // In openrazer-daemon 3.12.4, the thread that adds devices dies when one
+        // leaves during its 2 s wait, and nothing is added after that until
+        // the daemon restarts.
+        "devices missing" => (
+            format!(
+                "openrazer-daemon runs but hasn't listed {missing}, which the bridge offers it."
+            ),
+            "Restart it: systemctl --user restart openrazer-daemon.service".into(),
+        ),
+        _ => (
+            "Doctor couldn't ask this login's session bus whether openrazer-daemon runs.".into(),
+            "Run Doctor in your desktop session, not over SSH, and check: \
+             systemctl --user status openrazer-daemon"
+                .into(),
+        ),
+    }
+}
+
 fn full_findings(full: &Full) -> Vec<Finding> {
     let facts = match full {
         Full::NotInstalled => return Vec::new(),
@@ -1509,18 +1538,24 @@ fn full_findings(full: &Full) -> Vec<Finding> {
         findings.push(Finding::new(ErrorCode::BrokenInputLink, &[("link", link)]));
     }
     let group = ("group", OPENRAZER_GROUP);
-    let access = match facts.access {
-        Access::NotApplicable | Access::Ready => None,
-        Access::GroupMissing => Some((ErrorCode::OpenRazerGroupMissing, "group missing")),
-        Access::NotMember => Some((ErrorCode::OpenRazerNotReady, "not a member")),
-        Access::DaemonNotRunning => Some((ErrorCode::OpenRazerNotReady, "daemon not running")),
-        Access::Unverified => Some((ErrorCode::OpenRazerNotReady, "unverified")),
+    let missing = facts.unpublished.join(",");
+    let state = match facts.access {
+        Access::GroupMissing => {
+            let details = [group, ("access", "group missing")];
+            findings.push(Finding::new(ErrorCode::OpenRazerGroupMissing, &details));
+            None
+        }
+        Access::NotMember => Some("not a member"),
+        Access::DaemonNotRunning => Some("daemon not running"),
+        Access::Unverified => Some("unverified"),
+        Access::NotApplicable | Access::Ready => (!missing.is_empty()).then_some("devices missing"),
     };
-    if let Some((code, state)) = access {
-        findings.push(Finding::new(code, &[group, ("access", state)]));
-    } else if !facts.unpublished.is_empty() {
-        let missing = facts.unpublished.join(",");
-        let details = [group, ("access", "devices missing"), ("missing", &missing)];
+    if let Some(state) = state {
+        let (why, remedy) = openrazer_advice(state, &missing);
+        let mut details = vec![group, ("access", state), ("why", &why), ("remedy", &remedy)];
+        if !missing.is_empty() {
+            details.push(("missing", &missing));
+        }
         findings.push(Finding::new(ErrorCode::OpenRazerNotReady, &details));
     }
     for link in &facts.missing_key_links {

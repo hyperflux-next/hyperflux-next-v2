@@ -18,13 +18,6 @@ SITE=https://hyperflux-next.github.io/hyperflux-next-v2
 KEY_SHA256=e9238836e50b4fea26457ea1a2c29bb38c2fb63202374d4a035d33b616f1cfca
 KEY_FPR=206874CADD1B64B32483E2A85FC5921DE97AF7AA
 MOVING=https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/moving-from-2x.md
-# The releases the site has packages for, as in packaging/repository.conf.
-UBUNTU_SUITE=stonking
-UBUNTU_RELEASE=26.10
-DEBIAN_SUITE=forky
-DEBIAN_RELEASE=14
-FEDORA_RELEASE=44
-SUPPORTED="Arch Linux, Ubuntu $UBUNTU_RELEASE, Debian $DEBIAN_RELEASE, Fedora $FEDORA_RELEASE and openSUSE Tumbleweed"
 
 say() { printf '==> %s\n' "$*"; }
 die() {
@@ -112,7 +105,7 @@ install_apt() {
     say "Adding the key and the repository"
     as_root install -d -m 0755 /etc/apt/keyrings
     as_root install -m 0644 "$tmp/key.asc" /etc/apt/keyrings/hyperflux-next.asc
-    fetch "$SITE/$target/hyperflux-next.sources" "$tmp/sources"
+    fetch "$SITE/$target/$suite.sources" "$tmp/sources"
     as_root install -m 0644 "$tmp/sources" /etc/apt/sources.list.d/hyperflux-next.sources
     as_root apt-get update
     pkgs=hyperflux-next-v2-linux
@@ -193,10 +186,41 @@ install_zypper() {
     pm zypper ${yes:+--non-interactive} install $resolve $pkgs
 }
 
-# Sets target to the site's directory for this system. A derivative lists
-# the distribution it's based on in ID_LIKE. The release then comes from
-# UBUNTU_CODENAME on Ubuntu's derivatives, DEBIAN_CODENAME or
-# /etc/debian_version on Debian's, and VERSION_ID on Fedora's, which use
+# The site's list of releases it has packages for (packaging/releases):
+# TARGET RELEASE SUITE lines, "-" for none. listed TARGET prints that
+# target's "RELEASE SUITE" pairs.
+listed() {
+    while read -r t r s; do [ "$t" = "$1" ] && echo "$r $s"; done <"$tmp/releases"
+}
+
+# The releases in words, as the site's page says them: Arch Linux, Ubuntu
+# 26.10, Debian 14, Fedora 44 and 45, and openSUSE Tumbleweed.
+supported() {
+    said='' group='' last=''
+    while read -r t r _; do
+        case $t in
+        arch) n="Arch Linux" ;;
+        ubuntu) n=Ubuntu ;;
+        debian) n=Debian ;;
+        fedora) n=Fedora ;;
+        opensuse) n="openSUSE Tumbleweed" ;;
+        *) continue ;;
+        esac
+        [ "$r" = - ] && r=
+        if [ "$t" = "$last" ]; then
+            group="$group and $r"
+        else
+            [ -n "$group" ] && said=${said:+$said, }$group
+            group=$n${r:+ $r} last=$t
+        fi
+    done <"$tmp/releases"
+    if [ -n "$said" ]; then printf '%s, and %s' "$said" "$group"; else printf '%s' "$group"; fi
+}
+
+# Sets target to the site's directory for this system, and suite for APT. A
+# derivative lists the distribution it's based on in ID_LIKE. The release
+# then comes from UBUNTU_CODENAME on Ubuntu's derivatives, DEBIAN_CODENAME
+# or /etc/debian_version on Debian's, and VERSION_ID on Fedora's, which use
 # Fedora's numbers.
 detect() {
     if [ -r /etc/os-release ]; then
@@ -209,15 +233,20 @@ detect() {
         die "can't tell which distribution this is"
     fi
     name=${PRETTY_NAME:-${NAME:-this system}}
-    target=
+    target='' suite=''
     case " ${ID:-} ${ID_LIKE:-} " in
     *" arch "*) target=arch ;;
     *" ubuntu "*)
         base=${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}
-        if [ "$base" = "$UBUNTU_SUITE" ]; then
-            target=ubuntu
-        elif [ "${ID:-}" != ubuntu ] && [ -n "$base" ]; then
-            die "$name is based on Ubuntu $base, and the packages are for Ubuntu $UBUNTU_RELEASE ($UBUNTU_SUITE)."
+        for pair in $(listed ubuntu | tr ' ' :); do
+            [ "$base" = "${pair#*:}" ] && target=ubuntu suite=$base
+        done
+        if [ -z "$target" ] && [ "${ID:-}" != ubuntu ] && [ -n "$base" ]; then
+            have=''
+            for pair in $(listed ubuntu | tr ' ' :); do
+                have="${have:+$have and }Ubuntu ${pair%:*} (${pair#*:})"
+            done
+            die "$name is based on Ubuntu $base, and the packages are for $have."
         fi
         ;;
     *" debian "*)
@@ -226,14 +255,19 @@ detect() {
         else
             base=${DEBIAN_CODENAME:-}:$(cat /etc/debian_version 2>/dev/null || true)
         fi
-        case $base in
-        "$DEBIAN_SUITE":* | *:"$DEBIAN_RELEASE" | *:"$DEBIAN_RELEASE".* | *:"$DEBIAN_SUITE"/*) target=debian ;;
-        esac
+        for pair in $(listed debian | tr ' ' :); do
+            r=${pair%:*} s=${pair#*:}
+            case $base in "$s":* | *:"$r" | *:"$r".* | *:"$s"/*) target=debian suite=$s ;; esac
+        done
         ;;
-    *" fedora "*) [ "${VERSION_ID:-}" = "$FEDORA_RELEASE" ] && target=fedora ;;
+    *" fedora "*)
+        for pair in $(listed fedora | tr ' ' :); do
+            [ "${VERSION_ID:-}" = "${pair%:*}" ] && target=fedora
+        done
+        ;;
     *" opensuse-tumbleweed "*) target=opensuse ;;
     esac
-    [ -n "$target" ] || die "$name isn't supported. HyperFlux Next V2 has packages for $SUPPORTED, and distributions based on those releases can use them."
+    [ -n "$target" ] || die "$name isn't supported. HyperFlux Next V2 has packages for $(supported), and distributions based on those releases can use them."
 }
 
 enable_units() {
@@ -272,6 +306,9 @@ main() {
     fi
 
     [ "$(uname -m)" = x86_64 ] || die "the packages are for x86_64 only"
+    tmp=$(mktemp -d)
+    trap cleanup EXIT
+    fetch "$SITE/releases" "$tmp/releases" || die "can't download the list of releases from $SITE"
     detect
     # Artix and Devuan boot another init, and the bridge is a systemd
     # service. Stop only when PID 1 is a known other init: a minimal system
@@ -284,8 +321,14 @@ main() {
     # The last mount listed for / or /usr is the one in effect. Image-based
     # Fedora and openSUSE layer packages, and Core layers, as it adds no
     # kernel module. DKMS can't build Full's drivers into a read-only /usr.
+    # Plain sh reads the list: minimal images such as Tumbleweed's container
+    # have no awk.
     layer=
-    case $(awk '$2 == "/" || $2 == "/usr" {o = $4} END {print o}' /proc/mounts) in
+    mounted=
+    while read -r _ dir _ opts _; do
+        case $dir in / | /usr) mounted=$opts ;; esac
+    done </proc/mounts
+    case $mounted in
     ro*)
         if [ "$target" = fedora ] && [ -e /run/ostree-booted ]; then
             layer=rpm-ostree
@@ -301,8 +344,6 @@ main() {
         ;;
     esac
 
-    tmp=$(mktemp -d)
-    trap cleanup EXIT
     say "Getting the project signing key"
     fetch "$SITE/hyperflux-next-repository-key.asc" "$tmp/key.asc" || die "can't download the key from $SITE"
     got=$(sha256sum "$tmp/key.asc" | cut -d' ' -f1)
