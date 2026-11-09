@@ -37,7 +37,7 @@ sha2 = "=0.11.1"
 getrandom = "=0.4.3"
 
 # SIGTERM/SIGINT/SIGQUIT in the daemon and in long-running CLI commands.
-signal-hook = "=0.4.5"
+signal-hook = "=0.4.6"
 
 # Tests only.
 tempfile = "=3.27.0"
