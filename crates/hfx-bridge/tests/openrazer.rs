@@ -245,6 +245,21 @@ fn set_acked_before_exchange() {
 }
 
 #[test]
+fn saved_effect_also_goes_live() {
+    let rig = Rig::new();
+    let keyboard = rig.device(0x0296);
+    let before = rig.h.sim.requests(0, Lane::Keyboard).len();
+    let red = report::build(0x9f, 0x0f, 0x02, &[1, 5, 1, 0, 0, 1, 255, 0, 0]);
+    let data = keyboard.query(1, &red);
+    assert_eq!((data[0], data[8]), (2, 1));
+    let sent = rig.h.sim.requests(0, Lane::Keyboard);
+    assert_eq!(sent.len(), before + 3);
+    assert_eq!(sent[before], red);
+    assert_eq!(sent[before + 1][8..17], [0, 5, 1, 0, 0, 1, 255, 0, 0]);
+    assert_eq!(sent[before + 2][8..17], [2, 5, 1, 0, 0, 1, 255, 0, 0]);
+}
+
+#[test]
 fn unknown_command_refused() {
     let rig = Rig::new();
     let mouse = rig.device(0x00cd);

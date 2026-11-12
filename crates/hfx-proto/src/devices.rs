@@ -112,6 +112,9 @@ pub struct OpenRazer {
     pub event_file_regex: Option<&'static str>,
     /// Transaction id OpenRazer uses for get_serial on this device.
     pub serial_transaction_id: u8,
+    /// An Fn lighting combination puts the keyboard on onboard slot 2, and
+    /// OpenRazer's saved effects don't show there on their own.
+    pub onboard_lighting: bool,
     /// Suffix of the /dev/input/by-id link our udev rule adds on receiver
     /// interface 1 so OpenRazer finds key presses (keyboards only). The full
     /// name is `hyperflux-next-<ID_PATH_TAG>-<suffix>`.
@@ -199,6 +202,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerNagaV2ProWireless",
             event_file_regex: None,
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: &[
@@ -244,6 +248,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBasiliskV3ProWireless",
             event_file_regex: Some(".*Razer_Basilisk_V3_Pro_000000000000-if0(1|2)-event-kbd"),
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: BASILISK_V3_PRO,
@@ -261,6 +266,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerCobraProWireless",
             event_file_regex: Some(".*usb-Razer_Razer_Cobra_Pro-if0(1|2)-event-kbd"),
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: &[
@@ -302,6 +308,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBasiliskV3Pro35KWireless",
             event_file_regex: Some(".*Razer_Basilisk_V3_Pro_35K_000000000000-if0(1|2)-event-kbd"),
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: BASILISK_V3_PRO,
@@ -319,6 +326,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBasiliskV3Pro35KPhantomGreenEditionWireless",
             event_file_regex: None,
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: BASILISK_V3_PRO,
@@ -390,6 +398,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBlackWidowV3ProWireless",
             event_file_regex: Some(".*Razer_Razer_BlackWidow_V3_Pro(_\\d+)?(-if01)?-event-kbd"),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some("Razer_Razer_BlackWidow_V3_Pro-if01-event-kbd"),
         }),
         commands: &[
@@ -428,6 +437,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerDeathStalkerV2ProWireless",
             event_file_regex: Some(".*DSV2_Pro_000000000000-event-kbd"),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some("DSV2_Pro_000000000000-event-kbd"),
         }),
         commands: &[
@@ -463,6 +473,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerDeathStalkerV2ProTKLWireless",
             event_file_regex: Some(".*DSV2Pro_TKL_000000000000-if01-event-mouse"),
             serial_transaction_id: 0xff,
+            onboard_lighting: true,
             key_event_link: Some("DSV2Pro_TKL_000000000000-if01-event-mouse"),
         }),
         commands: &[
@@ -498,6 +509,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBlackWidowV4MiniHyperSpeedWireless",
             event_file_regex: Some(".*Razer_BlackWidow_V4_Mini_(-if01)?-event-kbd"),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some("Razer_BlackWidow_V4_Mini_-if01-event-kbd"),
         }),
         commands: &[
@@ -564,6 +576,7 @@ pub const DEVICES: &[Device] = &[
                 ".*Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed(_\\d+)?(-if01)?-event-mouse",
             ),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some(
                 "Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed-if01-event-mouse",
             ),

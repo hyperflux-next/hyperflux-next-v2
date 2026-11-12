@@ -586,6 +586,7 @@ driver = "razerkbd"
 class = "RazerDeathStalkerV2ProTKLWireless"
 event_file_regex = '.*DSV2Pro_TKL_000000000000-if01-event-mouse'
 serial_transaction_id = 0xff
+onboard_lighting = true
 key_event_link = "DSV2Pro_TKL_000000000000-if01-event-mouse"
 key_link_overlaps = []
 

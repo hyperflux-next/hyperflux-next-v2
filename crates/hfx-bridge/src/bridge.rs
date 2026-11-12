@@ -1578,10 +1578,15 @@ impl Bridge {
         };
         let doubt =
             |e: Option<&hfx_proto::devices::Device>| e.is_some_and(|e| e.tier != Tier::Tested);
-        if let Some((Some(again), Some((rx, lane)))) =
-            self.with_live(live, |l, e| l.exchanged(set_result, now, doubt(e)))
-        {
-            self.uhid_send(rx, lane, live, again);
+        match self.with_live(live, |l, e| l.exchanged(set_result, now, doubt(e))) {
+            Some((Some(again), Some((rx, lane)))) => self.uhid_send(rx, lane, live, again),
+            // Going away: nothing more goes out, and the driver has its answer.
+            Some((Some(_), None)) => {
+                self.with_live(live, |l, _| {
+                    l.exchanged(vdev::SetResult::NotSent, now, false)
+                });
+            }
+            _ => {}
         }
     }
 

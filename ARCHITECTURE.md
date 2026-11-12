@@ -946,7 +946,12 @@ subsystem `drivers`). Each qualified, available route of a device with an
 - Queries are retried up to 5 times on BUSY or on a transaction, class or
   command mismatch. OpenRazer gets the answer only on status 0x02 with all
   three matching.
-- Writes are sent once and returned byte for byte.
+- Writes are sent once and returned byte for byte. On a keyboard with
+  `onboard_lighting` in `devices.toml`, an effect or brightness that
+  OpenRazer saves to slot 1 is followed by the same write with storage 0
+  (what's on show) and storage 2 (what comes back at power-on). An Fn
+  lighting combination leaves the keyboard on slot 2, where the saved write
+  changes nothing on the keys. OpenRazer gets the saved write's answer.
 - A 0x04 reply recycles the device. For the next 60 s it is probed again at
   least every 2 s. That holds for the tested devices. For the others the
   bridge first asks 07/80 itself, and recycles when that gets 0x04 too, or
