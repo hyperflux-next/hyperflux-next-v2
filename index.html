@@ -1,19 +1,483 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HyperFlux Next V2 package repository</title>
-<h1>HyperFlux Next V2 package repository</h1>
-<p>HyperFlux Next V2 1.0.4 for Arch Linux, Ubuntu 26.10, Debian 14, Fedora 44 and 45, and openSUSE Tumbleweed.
-Follow the install guide for your distribution; it adds this repository
-and checks the project signing key.</p>
-<p>Or paste one line. It runs the guide's steps for you and asks before it
-installs anything:</p>
-<pre>curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh</pre>
-<ul>
-<li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/install-arch.md">Arch Linux</a></li>
-<li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/install-apt.md">Ubuntu and Debian</a></li>
-<li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/install-rpm.md">Fedora and openSUSE</a></li>
-</ul>
-<p>Source, issues and release notes: <a href="https://github.com/hyperflux-next/hyperflux-next-v2">https://github.com/hyperflux-next/hyperflux-next-v2</a></p>
+<title>HyperFlux Next V2: Razer HyperFlux V2 on Linux</title>
+<meta name="description" content="Linux support for the Razer HyperFlux V2 receiver. OpenRazer, Polychromatic and OpenRGB control the keyboards and mice paired to it, and their batteries show in the desktop's battery widget. Packages for Arch Linux, Ubuntu, Debian, Fedora and openSUSE.">
+<link rel="canonical" href="https://hyperflux-next.github.io/hyperflux-next-v2/">
+<meta name="color-scheme" content="dark light">
+<meta name="google-site-verification" content="aiuTZX_CnL66VFioXml21HXCZ5fZnm-tn4G6Jz-4BVE">
+<style>
+@font-face {
+  font-family: "Martian Mono";
+  src: url("fonts/martian-mono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-stretch: 87.5% 112.5%;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
+  --text-xs: 0.8125rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.25rem; --text-xl: 1.5625rem;
+  --text-display-s: clamp(2.25rem, 4vw + 0.5rem, 3.75rem);
+  --text-section: clamp(1.75rem, 2vw + 1rem, 2.75rem); --text-title: clamp(1.125rem, 0.6vw + 0.875rem, 1.375rem); --text-lead: clamp(1.0625rem, 0.3vw + 1rem, 1.25rem);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-micro: 120ms; --dur-short: 220ms;
+  --container: 1280px; --gutter: 64px; --gap-columns: 32px; --section-gap: 128px;
+  --color-paper: oklch(12.5% 0.012 150); --color-paper-2: oklch(16% 0.016 150); --color-paper-3: oklch(20.5% 0.022 150);
+  --color-ink: oklch(94% 0.03 140); --color-ink-2: oklch(82% 0.05 142); --color-muted: oklch(64% 0.06 145);
+  --color-rule: oklch(27% 0.028 148); --color-rule-2: oklch(38% 0.045 146);
+  --color-accent: oklch(87% 0.2 142); --color-accent-ink: oklch(14% 0.02 150); --color-focus: oklch(87% 0.2 142);
+  --color-accent-wash: oklch(23% 0.06 145);
+  --font-display: "Martian Mono", ui-monospace, "DejaVu Sans Mono", monospace; --font-body: var(--font-display);
+  --rule-hair: 1px;
+  --tracking-display: -0.02em; --display-weight: 500; --stretch-display: 112.5%; --stretch-body: 87.5%;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --color-paper: oklch(97.5% 0.008 140); --color-paper-2: oklch(94.5% 0.013 142); --color-paper-3: oklch(91% 0.02 142);
+    --color-ink: oklch(21% 0.03 150); --color-ink-2: oklch(31% 0.04 148); --color-muted: oklch(45% 0.045 146);
+    --color-rule: oklch(87% 0.02 145); --color-rule-2: oklch(74% 0.035 145);
+    --color-accent: oklch(46% 0.14 145); --color-accent-ink: oklch(98% 0.01 140); --color-focus: oklch(46% 0.14 145);
+    --color-accent-wash: oklch(91.5% 0.05 145);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+html { scroll-padding-top: var(--space-xl); scrollbar-color: var(--color-muted) var(--color-paper); }
+body {
+  margin: 0; background: var(--color-paper); color: var(--color-ink);
+  font-family: var(--font-body); font-size: var(--text-md); font-stretch: var(--stretch-body);
+  line-height: 1.65; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--color-accent-wash); color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+h1, h2, h3 {
+  margin: 0; font-family: var(--font-display); font-weight: var(--display-weight); font-stretch: var(--stretch-display);
+  letter-spacing: var(--tracking-display); line-height: 1.12; overflow-wrap: break-word; min-width: 0; text-wrap: balance;
+}
+h1 { font-size: clamp(2.25rem, 3.2vw + 0.5rem, 3.25rem); }
+h2 { font-size: var(--text-section); max-width: 24ch; }
+h3 { font-size: var(--text-title); line-height: 1.3; }
+p { margin: 0; max-width: 62ch; text-wrap: pretty; }
+a { color: var(--color-ink-2); text-decoration: underline dotted; text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+a:hover { color: var(--color-accent); }
+code, pre { font-family: inherit; }
+pre { margin: 0; }
+.container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: max(var(--gutter), env(safe-area-inset-left, 0px)) max(var(--gutter), env(safe-area-inset-right, 0px)); }
+.muted { color: var(--color-muted); }
+.ok { color: var(--color-accent); }
+.small { font-size: var(--text-sm); }
+[hidden] { display: none !important; }
+button { font: inherit; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* nav */
+.nav { border-bottom: var(--rule-hair) solid var(--color-rule); }
+.nav .container { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); min-height: 64px; }
+.wordmark { color: var(--color-ink); text-decoration: none; white-space: nowrap; font-weight: 700; font-stretch: var(--stretch-display); }
+.wordmark:hover { color: var(--color-accent); }
+.nav ul { display: flex; gap: var(--space-lg); margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.nav ul a { text-decoration: none; color: var(--color-ink-2); }
+.nav ul a:hover { color: var(--color-accent); text-decoration: underline dotted; }
+
+/* hero */
+.hero .container {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3xl);
+  align-items: center; min-height: calc(100svh - 65px); padding-block: var(--space-2xl) var(--space-3xl);
+}
+.hero-text { display: grid; gap: var(--space-lg); align-content: center; min-width: 0; }
+.lead { font-size: var(--text-lead); line-height: 1.5; color: var(--color-ink-2); max-width: 40ch; }
+.hero-links { display: flex; flex-wrap: wrap; gap: var(--space-lg); font-size: var(--text-sm); }
+
+/* the install well */
+.well { background: var(--color-paper-2); border: var(--rule-hair) solid var(--color-rule); min-width: 0; }
+.tabs { display: flex; border-bottom: var(--rule-hair) solid var(--color-rule); }
+.tabs button {
+  appearance: none; border: 0; background: none; color: var(--color-muted); font-size: var(--text-sm);
+  padding: var(--space-sm) var(--space-md); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color var(--dur-micro) steps(1), border-color var(--dur-micro) steps(1);
+}
+.tabs button:hover { color: var(--color-ink); }
+.tabs button[aria-selected="true"] { color: var(--color-ink); border-bottom-color: var(--color-accent); }
+.tabs button:focus-visible { outline-offset: -2px; }
+.panel { display: flex; align-items: flex-start; gap: var(--space-md); padding: var(--space-md); }
+.panel pre { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-md); line-height: 1.6; }
+.panel-label { display: none; }
+.no-js .panel-label { display: block; font-size: var(--text-sm); color: var(--color-muted); padding: var(--space-sm) var(--space-md) 0; }
+.no-js .tabs { display: none; }
+.prompt { color: var(--color-muted); user-select: none; }
+.copy {
+  appearance: none; flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: var(--rule-hair) solid var(--color-rule); background: var(--color-paper); color: var(--color-ink-2); cursor: pointer;
+  transition: background-color var(--dur-micro) steps(1), color var(--dur-micro) steps(1), border-color var(--dur-micro) steps(1);
+}
+.copy:hover { background: var(--color-paper-3); color: var(--color-ink); }
+.copy:active { background: var(--color-accent-wash); }
+.copy[data-done] { color: var(--color-accent); border-color: var(--color-accent); }
+.copy svg { width: 16px; height: 16px; }
+.copy .tick, .copy[data-done] .sheets { display: none; }
+.copy[data-done] .tick { display: block; }
+.well-note { padding: 0 var(--space-md) var(--space-md); font-size: var(--text-sm); color: var(--color-muted); }
+
+/* the session */
+.session { margin: 0; min-width: 0; }
+.session pre {
+  background: var(--color-paper-2); border: var(--rule-hair) solid var(--color-rule);
+  padding: var(--space-xl); font-size: clamp(0.9375rem, 1.25vw, 1.125rem); line-height: 1.8;
+  white-space: pre-wrap; overflow-wrap: anywhere; min-height: 24rem;
+}
+.session .ok { color: var(--color-accent); }
+.session figcaption { margin-top: var(--space-sm); font-size: var(--text-sm); color: var(--color-muted); }
+.caret { display: inline-block; width: 0.6em; height: 1.1em; vertical-align: -0.18em; background: var(--color-accent); animation: blink 1s steps(1) 5; }
+@keyframes blink { 50% { opacity: 0; } }
+.wait { opacity: 0; }
+
+/* sections */
+.section { border-top: var(--rule-hair) solid var(--color-rule); padding-block: var(--section-gap); }
+.section-head { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3xl); align-items: end; margin-bottom: var(--space-2xl); }
+.section-head p { color: var(--color-ink-2); }
+
+/* where they show up: a reference as rows */
+.rows { margin: 0; padding: 0; list-style: none; border-top: var(--rule-hair) solid var(--color-rule-2); }
+.rows li { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3xl); padding-block: var(--space-lg); border-bottom: var(--rule-hair) solid var(--color-rule); align-items: baseline; }
+.rows .name { font-size: var(--text-title); font-stretch: var(--stretch-display); color: var(--color-ink); }
+.rows .what { color: var(--color-ink-2); }
+.rows .arg { color: var(--color-accent); }
+.aside { margin-top: var(--space-xl); color: var(--color-muted); }
+
+/* install: the stages */
+.stages { margin: 0; padding: 0; list-style: none; counter-reset: stage; }
+.stage { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3xl); padding-block: var(--space-2xl); border-top: var(--rule-hair) solid var(--color-rule); counter-increment: stage; }
+.stage:first-child { border-top: 0; padding-top: 0; }
+.stage h3::before { content: counter(stage) ". "; color: var(--color-accent); }
+.stage-text { display: grid; gap: var(--space-md); align-content: start; }
+.stage-text p { color: var(--color-ink-2); }
+.output { background: var(--color-paper-2); border: var(--rule-hair) solid var(--color-rule); padding: var(--space-lg); white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-md); line-height: 1.7; min-width: 0; }
+.output .ok { color: var(--color-accent); }
+.distros { margin: 0; padding: 0; list-style: none; border-top: var(--rule-hair) solid var(--color-rule-2); min-width: 0; }
+.distros li { border-bottom: var(--rule-hair) solid var(--color-rule); }
+.distros a {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); align-items: baseline;
+  padding: var(--space-md) var(--space-sm); text-decoration: none; color: var(--color-ink);
+  transition: background-color var(--dur-micro) steps(1);
+}
+.distros a:hover { background: var(--color-paper-3); color: var(--color-ink); }
+.distros a:active { background: var(--color-accent-wash); }
+.distros .os { font-size: var(--text-title); font-stretch: var(--stretch-display); }
+.distros .guide { font-size: var(--text-sm); color: var(--color-muted); }
+.distros a:hover .guide { color: var(--color-accent); }
+
+/* devices */
+.table-wrap { overflow-x: auto; border-top: var(--rule-hair) solid var(--color-rule-2); }
+table { width: 100%; border-collapse: collapse; font-size: var(--text-md); }
+th { text-align: left; font-weight: 400; font-size: var(--text-sm); color: var(--color-muted); padding: var(--space-sm) var(--space-md) var(--space-sm) 0; border-bottom: var(--rule-hair) solid var(--color-rule-2); white-space: nowrap; }
+td { padding: var(--space-md) var(--space-md) var(--space-md) 0; border-bottom: var(--rule-hair) solid var(--color-rule); vertical-align: baseline; }
+td:first-child { color: var(--color-ink); min-width: 16ch; }
+td.kind, td.apps { color: var(--color-ink-2); }
+td.status { white-space: nowrap; color: var(--color-muted); }
+td.status.tested { color: var(--color-accent); }
+tr.tested td { background: var(--color-accent-wash); }
+.table-notes { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3xl); margin-top: var(--space-xl); color: var(--color-muted); font-size: var(--text-sm); }
+
+/* help */
+.help .container { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3xl); align-items: start; }
+.help-text { display: grid; gap: var(--space-lg); }
+.help-text p { color: var(--color-ink-2); }
+.help-links { display: flex; flex-wrap: wrap; gap: var(--space-lg); font-size: var(--text-sm); }
+
+/* footer: the mast */
+.footer { border-top: var(--rule-hair) solid var(--color-rule); padding-block: var(--space-3xl) var(--space-2xl); }
+.footer .mast { font-size: clamp(1.75rem, 5.2vw, 4.75rem); font-weight: 500; font-stretch: var(--stretch-display); letter-spacing: -0.03em; line-height: 1; color: var(--color-ink); overflow-wrap: anywhere; margin-bottom: var(--space-xl); }
+.footer ul { display: flex; flex-wrap: wrap; gap: var(--space-sm) var(--space-lg); margin: 0 0 var(--space-xl); padding: 0; list-style: none; font-size: var(--text-sm); }
+.footer p { font-size: var(--text-sm); color: var(--color-muted); max-width: 70ch; }
+
+@media (max-width: 60rem) {
+  :root { --gutter: 24px; --section-gap: 88px; }
+  .hero .container, .section-head, .rows li, .stage, .table-notes, .help .container { grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
+  .hero .container { min-height: 0; padding-block: var(--space-2xl); }
+  .rows li { gap: var(--space-xs); }
+  .session pre { min-height: 0; font-size: var(--text-md); padding: var(--space-lg); }
+}
+@media (max-width: 40rem) {
+  :root { --gutter: 16px; --section-gap: 64px; }
+  .nav ul { gap: var(--space-md); }
+  .nav .hide-narrow { display: none; }
+  .wordmark { font-size: var(--text-sm); }
+  .stage { padding-block: var(--space-xl); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  .wait { opacity: 1; }
+}
+</style>
+</head>
+<body class="no-js">
+<script>document.body.classList.remove("no-js");</script>
+
+<header class="nav">
+  <div class="container">
+    <a class="wordmark" href="./">hyperflux-next-v2</a>
+    <nav aria-label="Page">
+      <ul>
+        <li><a href="#install">Install</a></li>
+        <li class="hide-narrow"><a href="#devices">Devices</a></li>
+        <li class="hide-narrow"><a href="#help">Help</a></li>
+        <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2">Source</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container">
+      <div class="hero-text">
+        <h1>Razer HyperFlux V2 on Linux.</h1>
+        <p class="lead">OpenRazer, Polychromatic and OpenRGB control the devices paired to it.</p>
+        <div class="well" data-tabs>
+          <div class="tabs" role="tablist" aria-label="How to install">
+            <button type="button" role="tab" id="tab-line" aria-controls="panel-line" aria-selected="true">One line</button>
+            <button type="button" role="tab" id="tab-read" aria-controls="panel-read" aria-selected="false" tabindex="-1">Read it first</button>
+          </div>
+          <p class="panel-label">One line</p>
+          <div class="panel" role="tabpanel" id="panel-line" aria-labelledby="tab-line">
+            <pre><code><span class="prompt">$ </span>curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh</code></pre>
+            <button type="button" class="copy" aria-label="Copy the command">
+              <svg class="sheets" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8"/><path d="M10.5 5.5v-3h-8v8h3"/></svg>
+              <svg class="tick" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>
+            </button>
+          </div>
+          <p class="panel-label">Read it first</p>
+          <div class="panel" role="tabpanel" id="panel-read" aria-labelledby="tab-read" data-hide-js>
+            <pre><code><span class="prompt">$ </span>curl -fsSLO https://hyperflux-next.github.io/hyperflux-next-v2/install.sh
+<span class="prompt">$ </span>less install.sh
+<span class="prompt">$ </span>sh install.sh</code></pre>
+            <button type="button" class="copy" aria-label="Copy the commands">
+              <svg class="sheets" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8"/><path d="M10.5 5.5v-3h-8v8h3"/></svg>
+              <svg class="tick" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>
+            </button>
+          </div>
+          <p class="well-note">Your package manager asks before it installs, and the script asks before it reboots. Version 1.0.5, x86_64.</p>
+        </div>
+        <div class="hero-links">
+          <a href="#install">Install guides</a>
+        </div>
+      </div>
+
+      <figure class="session" data-session>
+        <pre><code><span class="step"><span class="prompt">~ $ </span><span class="cmd">hyperfluxctl battery</span></span>
+<span class="out">Razer Basilisk V3 Pro 35K: 79% charging
+Razer DeathStalker V2 Pro TKL: 95%</span>
+<span class="step"><span class="prompt">~ $ </span><span class="cmd">hyperfluxctl doctor</span></span>
+<span class="out"><span class="ok">HyperFlux Next V2 is ready.</span>
+Driver active, bridge running, 1 receiver.
+No action required.</span>
+<span class="step"><span class="prompt">~ $ </span><span class="caret" aria-hidden="true"></span></span></code></pre>
+        <figcaption>The keyboard and mouse I test with, both on one receiver.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="where">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="where">Where they show up</h2>
+        <p>Typing and pointing don't go through it, so they work as they always have.</p>
+      </div>
+      <ul class="rows">
+        <li><span class="name">OpenRazer</span><span class="what">Lighting and battery, in <span class="arg">Polychromatic</span> and other OpenRazer apps.</span></li>
+        <li><span class="name">OpenRGB</span><span class="what">Lighting through a plugin, for OpenRGB <span class="arg">1.1</span> (and Debian's 1.0).</span></li>
+        <li><span class="name">Battery widget</span><span class="what">Charge level, and whether it's charging.</span></li>
+        <li><span class="name">hyperfluxctl</span><span class="what"><span class="arg">status</span>, <span class="arg">devices</span>, <span class="arg">battery</span> and <span class="arg">doctor</span> in a terminal.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="install" aria-labelledby="install-head">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="install-head">Install</h2>
+        <p>Packages for x86_64, signed by the project. A distribution based on one of these releases can use them too, if it runs systemd.</p>
+      </div>
+      <ol class="stages">
+        <li class="stage">
+          <div class="stage-text">
+            <h3>Plug in the receiver</h3>
+            <p>Before you start.</p>
+          </div>
+          <pre class="output"><span class="prompt">$ </span>lsusb | grep 1532:00cf
+Bus 003 Device 002: ID 1532:00cf Razer USA, Ltd Razer HyperFlux V2</pre>
+        </li>
+        <li class="stage">
+          <div class="stage-text">
+            <h3>Run the one line, or follow a guide</h3>
+            <p>Both add the package repository and install <code>hyperflux-next-v2-full</code>. On Ubuntu and Fedora the OpenRGB plugin is a separate package. openSUSE has none.</p>
+          </div>
+          <ul class="distros">
+            <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/install-arch.md"><span class="os">Arch Linux</span><span class="guide">guide</span></a></li>
+            <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/install-apt.md"><span class="os">Ubuntu 26.10, Debian 14</span><span class="guide">guide</span></a></li>
+            <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/install-rpm.md"><span class="os">Fedora 44 and 45, openSUSE Tumbleweed</span><span class="guide">guide</span></a></li>
+          </ul>
+        </li>
+        <li class="stage">
+          <div class="stage-text">
+            <h3>Ask doctor</h3>
+            <p>After the reboot, <code>hyperfluxctl doctor</code> prints <span class="ok">HyperFlux Next V2 is ready.</span> When something is missing it names it, with the fix:</p>
+          </div>
+          <pre class="output"><span class="prompt">$ </span>hyperfluxctl doctor
+HyperFlux Next V2 needs attention.
+Primary issue: [HFX-401] The OpenRazer driver from HyperFlux Next V2 isn't active yet.
+Do: Reboot. If Doctor still reports it, reinstall hyperflux-next-v2-openrazer-driver-dkms.</pre>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="devices" aria-labelledby="devices-head">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="devices-head">Devices on the receiver</h2>
+        <p>Tested: used through the receiver. Checked: Razer lists it, and OpenRazer or OpenRGB drives it.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Device</th><th scope="col">Status</th><th scope="col">Works in</th></tr></thead>
+          <tbody>
+            <tr class="tested"><td>Basilisk V3 Pro 35K</td><td class="status tested">tested</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr class="tested"><td>DeathStalker V2 Pro TKL</td><td class="status tested">tested</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>Naga V2 Pro</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>Naga V3 Pro</td><td class="status">checked</td><td class="apps">OpenRGB 1.1</td></tr>
+            <tr><td>Basilisk V3 Pro</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>Basilisk V3 Pro 35K Phantom Green Edition</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>Cobra Pro</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>BlackWidow V3 Pro</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>DeathStalker V2 Pro</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+            <tr><td>BlackWidow V4 Mini HyperSpeed</td><td class="status">checked</td><td class="apps">OpenRazer</td></tr>
+            <tr><td>BlackWidow V4 Low-Profile TKL HyperSpeed</td><td class="status">checked</td><td class="apps">OpenRGB</td></tr>
+            <tr><td>BlackWidow V4 Tenkeyless HyperSpeed</td><td class="status">checked</td><td class="apps">OpenRazer, OpenRGB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-notes">
+        <p>Four more are on Razer's list but not driven by either yet.</p>
+        <p><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/hardware.md">Hardware</a> has their USB ids. If you own a checked device, a short <a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/hardware.md#reporting-a-device">device report</a> helps the next person.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section help" id="help" aria-labelledby="help-head">
+    <div class="container">
+      <div class="help-text">
+        <h2 id="help-head">When something doesn't work</h2>
+        <p>Start with <code>hyperfluxctl doctor</code> and do what it says. Each code it prints is explained in troubleshooting.</p>
+        <div class="help-links">
+          <a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/troubleshooting.md">Troubleshooting</a>
+          <a href="https://github.com/hyperflux-next/hyperflux-next-v2/discussions">Discussions</a>
+          <a href="https://github.com/hyperflux-next/hyperflux-next-v2/issues/new/choose">Report a bug</a>
+        </div>
+      </div>
+      <div class="well">
+        <div class="panel">
+          <pre><code><span class="prompt">$ </span>curl -fsSL https://hyperflux-next.github.io/hyperflux-next-v2/install.sh | sh</code></pre>
+          <button type="button" class="copy" aria-label="Copy the command">
+            <svg class="sheets" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8"/><path d="M10.5 5.5v-3h-8v8h3"/></svg>
+            <svg class="tick" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>
+          </button>
+        </div>
+        <p class="well-note">Moving from the older 2.x packages? Read <a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/moving-from-2x.md">moving from 2.x</a> first.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p class="mast" aria-hidden="true">hyperflux-next-v2</p>
+    <ul>
+      <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2">Source</a></li>
+      <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/releases">Releases</a></li>
+      <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/CHANGELOG.md">Changelog</a></li>
+      <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/README.md">Documentation</a></li>
+      <li><a href="https://github.com/hyperflux-next/hyperflux-next-v2/blob/main/docs/user/privacy.md">Privacy</a></li>
+      <li><a href="hyperflux-next-repository-key.asc">Signing key</a></li>
+    </ul>
+    <p>Free software under the GNU General Public License, version 2 only. Not affiliated with or endorsed by Razer.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // Tabs: without script both commands show, one under the other.
+  for (const well of document.querySelectorAll("[data-tabs]")) {
+    const tabs = [...well.querySelectorAll('[role="tab"]')];
+    const show = (tab) => {
+      for (const t of tabs) {
+        const on = t === tab;
+        t.setAttribute("aria-selected", on);
+        t.tabIndex = on ? 0 : -1;
+        document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+      }
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener("click", () => show(t));
+      t.addEventListener("keydown", (e) => {
+        const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
+        const next = tabs[(i + step + tabs.length) % tabs.length];
+        show(next);
+        next.focus();
+      });
+    });
+    show(tabs[0]);
+  }
+
+  // Copy the command without the prompts. Some browsers refuse the
+  // clipboard; then the text is selected for the user to copy.
+  for (const button of document.querySelectorAll(".copy")) {
+    button.addEventListener("click", async () => {
+      const code = button.parentElement.querySelector("code");
+      const text = [...code.childNodes].filter((n) => !(n.classList && n.classList.contains("prompt"))).map((n) => n.textContent).join("");
+      try {
+        await navigator.clipboard.writeText(text);
+        button.dataset.done = "";
+        button.setAttribute("aria-label", "Copied");
+        setTimeout(() => { delete button.dataset.done; button.setAttribute("aria-label", "Copy the command"); }, 1400);
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+      }
+    });
+  }
+
+  // The session types each command once and prints its output. Hidden
+  // parts keep their space, so nothing below moves.
+  const session = document.querySelector("[data-session]");
+  if (session && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const parts = [...session.querySelectorAll(".step, .out")];
+    const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+    for (const part of parts) part.classList.add("wait");
+    (async () => {
+      for (const part of parts) {
+        part.classList.remove("wait");
+        const cmd = part.querySelector(".cmd");
+        if (!cmd) { await sleep(160); continue; }
+        const full = cmd.textContent;
+        for (let i = 0; i <= full.length; i++) {
+          cmd.textContent = full.slice(0, i);
+          await sleep(45);
+        }
+        await sleep(240);
+      }
+    })();
+  }
+})();
+</script>
+</body>
 </html>
