@@ -9,7 +9,7 @@ members = [
 # The product version. scripts/set-version changes it here and in the other
 # version locations listed in ARCHITECTURE.md; a test checks they agree.
 [workspace.package]
-version = "1.0.4"
+version = "1.0.5"
 edition = "2024"
 rust-version = "1.95"
 license = "GPL-2.0-only"
@@ -37,7 +37,7 @@ sha2 = "=0.11.1"
 getrandom = "=0.4.3"
 
 # SIGTERM/SIGINT/SIGQUIT in the daemon and in long-running CLI commands.
-signal-hook = "=0.4.5"
+signal-hook = "=0.4.6"
 
 # Tests only.
 tempfile = "=3.27.0"

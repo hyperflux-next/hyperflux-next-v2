@@ -111,6 +111,11 @@ To turn the links back on, remove that file and reboot.
 
 - OpenRGB may describe a black keyboard as Quartz. Nothing but the
   description is wrong.
+- Programs that control OpenRGB through its SDK server, over the network,
+  see the keyboard and mouse only with Serve All Controllers turned on in
+  OpenRGB's Server settings. By default the server lists just the devices
+  OpenRGB found itself, and a plugin's devices aren't among them (checked
+  with OpenRGB 1.1).
 - The keyboard's own Fn lighting shortcuts change the lighting inside the
   keyboard, and OpenRazer and Polychromatic don't notice. Apply the effect
   again from the app to take control back.

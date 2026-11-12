@@ -103,6 +103,7 @@ def rust_devices():
                 "class": rust_string(inner["class"]),
                 "event_file_regex": rust_option(inner["event_file_regex"]),
                 "serial_transaction_id": int(inner["serial_transaction_id"], 16),
+                "onboard_lighting": inner["onboard_lighting"] == "true",
                 "key_event_link": rust_option(inner["key_event_link"]),
             }
         else:
@@ -138,6 +139,7 @@ def test_rust_devices():
             want.pop("key_link_overlaps", None)
             want.setdefault("event_file_regex", None)
             want.setdefault("key_event_link", None)
+            want.setdefault("onboard_lighting", False)
             assert got["openrazer"] == want, label
 
 

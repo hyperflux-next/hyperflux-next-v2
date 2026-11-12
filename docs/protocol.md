@@ -441,9 +441,12 @@ A Razer feature report:
 
 The class, id and data size must be in the device's command list
 (`devices.toml`), which has the commands that OpenRazer 3.12.4 and OpenRGB
-1.1 send to the device. Setting the device mode (class `0x00`, id
-`0x04`) accepts mode `0x00` or `0x03` with a zero second byte, and nothing
-else.
+1.1 send to the device. A few models also have settings recorded from
+Razer Synapse on them: the DeathStalker V2 Pro TKL's sleep and dimming
+timers, and the Basilisk V3 Pro 35K's Smart Dimming, scroll levels and
+charge limit.
+Setting the device mode (class `0x00`, id `0x04`) accepts mode `0x00` or
+`0x03` with a zero second byte, and nothing else.
 
 #### Lighting bursts
 

@@ -94,27 +94,9 @@ printf '%s\n' '[hyperflux-next]' 'name=HyperFlux Next V2 for openSUSE' "baseurl=
 echo "$releases" >"$site/releases"
 
 project_url=$(sed -n 's/^PROJECT_URL ?= //p' Makefile)
-cat >"$site/index.html" <<EOF
-<!doctype html>
-<html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HyperFlux Next V2 package repository</title>
-<h1>HyperFlux Next V2 package repository</h1>
-<p>HyperFlux Next V2 $version for $(python3 -I scripts/releases.py names).
-Follow the install guide for your distribution; it adds this repository
-and checks the project signing key.</p>
-<p>Or paste one line. It runs the guide's steps for you and asks before it
-installs anything:</p>
-<pre>curl -fsSL $site_url/install.sh | sh</pre>
-<ul>
-<li><a href="$project_url/blob/main/docs/user/install-arch.md">Arch Linux</a></li>
-<li><a href="$project_url/blob/main/docs/user/install-apt.md">Ubuntu and Debian</a></li>
-<li><a href="$project_url/blob/main/docs/user/install-rpm.md">Fedora and openSUSE</a></li>
-</ul>
-<p>Source, issues and release notes: <a href="$project_url">$project_url</a></p>
-</html>
-EOF
+python3 -I scripts/site-page.py "$version" "$site_url" "$project_url" >"$site/index.html"
+# The page's font, with its licence.
+install -D -m 0644 -t "$site/fonts" packaging/site/fonts/martian-mono.woff2 packaging/site/fonts/OFL.txt
 install -m 0644 packaging/install.sh "$site/install.sh"
 touch "$site/.nojekyll"
 echo "Unsigned site for $version is in $site"

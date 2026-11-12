@@ -348,6 +348,10 @@ impl VirtualDevice {
 pub struct SetState {
     pub request: Report,
     pub attempts: u8,
+    /// Storage bytes that still get a copy of `request`.
+    pub copies: &'static [u8],
+    /// The saved write's answer, kept while its copies are out.
+    pub answer: Option<Report>,
 }
 
 /// A UHID device the keeper made.
@@ -400,6 +404,25 @@ fn device_mode(mode: &mut [u8; 2], request: &Report) -> Option<Report> {
     response[report::ARGS..report::ARGS + 2].copy_from_slice(mode);
     response[report::CHECKSUM] = report::checksum(&response);
     Some(response)
+}
+
+/// OpenRazer saves effects and brightness in onboard slot 1. An Fn lighting
+/// combination leaves the keyboard on slot 2, and it answers those writes
+/// with 0x02 while nothing changes on the keys. Storage 0 changes what's on
+/// show, and slot 2 is what the keyboard loads when it's next switched on.
+const ONBOARD_COPIES: &[u8] = &[0x00, 0x02];
+
+fn saved_lighting(request: &Report) -> bool {
+    request[report::CLASS] == 0x0f
+        && matches!(request[report::COMMAND], 0x02 | 0x04)
+        && request[report::ARGS] == 0x01
+}
+
+fn with_storage(request: &Report, storage: u8) -> Report {
+    let mut copy = *request;
+    copy[report::ARGS] = storage;
+    copy[report::CHECKSUM] = report::checksum(&copy);
+    copy
 }
 
 impl Live {
@@ -474,9 +497,19 @@ impl Live {
         if self.response.is_some() {
             return None;
         }
+        let onboard = entry
+            .and_then(|e| e.openrazer.as_ref())
+            .is_some_and(|o| o.onboard_lighting);
+        let copies = if onboard && saved_lighting(&request) {
+            ONBOARD_COPIES
+        } else {
+            &[]
+        };
         self.set = Some(SetState {
             request,
             attempts: 1,
+            copies,
+            answer: None,
         });
         Some(request)
     }
@@ -493,6 +526,10 @@ impl Live {
     pub fn exchanged(&mut self, result: SetResult, now: u64, doubt: bool) -> Option<Report> {
         let set = self.set.as_mut()?;
         let request = set.request;
+        let accepted = matches!(
+            &result,
+            SetResult::Matched(r) if r[report::STATUS] == report::STATUS_SUCCESS
+        );
         let response = match result {
             SetResult::Matched(response) => {
                 let asleep = response[report::STATUS] == report::STATUS_TIMEOUT;
@@ -501,7 +538,9 @@ impl Live {
                 } else if asleep {
                     self.recycle_at = Some(now + RECYCLE_WAIT_MS);
                 }
-                if !report::is_query(&request) || decode::query_answered(&request, &response) {
+                // A copy can be sent again like a query: it's the same write.
+                let again = report::is_query(&request) || set.answer.is_some();
+                if !again || decode::query_answered(&request, &response) {
                     response
                 } else if decode::query_retryable(&request, &response)
                     && set.attempts < QUERY_ATTEMPTS
@@ -515,6 +554,14 @@ impl Live {
             SetResult::NotSent => envelope(Uncertainty::NotSent),
             SetResult::MayHaveBeenSent => envelope(Uncertainty::MayHaveBeenSent),
         };
+        if accepted && let Some((&storage, rest)) = set.copies.split_first() {
+            let copy = with_storage(&set.request, storage);
+            set.answer.get_or_insert(response);
+            (set.request, set.attempts, set.copies) = (copy, 1, rest);
+            return Some(copy);
+        }
+        // OpenRazer asked for the saved write, so that's the answer it gets.
+        let response = set.answer.take().unwrap_or(response);
         self.set = None;
         match self.get.take() {
             Some(id) => {
@@ -742,6 +789,8 @@ mod tests {
         Some(SetState {
             request,
             attempts: 1,
+            copies: &[],
+            answer: None,
         })
     }
 
@@ -804,6 +853,101 @@ mod tests {
         live.set = pending(request);
         live.exchanged(SetResult::NotSent, 0, false);
         assert_eq!(live.response, Some(envelope(Uncertainty::NotSent)));
+    }
+
+    fn answered(request: &Report) -> Report {
+        let mut answer = *request;
+        answer[0] = report::STATUS_SUCCESS;
+        answer
+    }
+
+    /// A SET the keyboard's table admits, on a started device.
+    fn sent(live: &mut Live, request: Report) -> Report {
+        let keyboard = devices::device(0x0296);
+        live.started = true;
+        let out = live.set(1, request, keyboard).unwrap();
+        live.replies.clear();
+        out
+    }
+
+    #[test]
+    fn saved_lighting_shows() {
+        let red = report::build(0x9f, 0x0f, 0x02, &[1, 5, 1, 0, 0, 1, 255, 0, 0]);
+        let dim = report::build(0x9f, 0x0f, 0x04, &[1, 5, 76]);
+        for write in [red, dim] {
+            let mut live = live();
+            assert_eq!(sent(&mut live, write), write);
+            let accepted = answered(&write);
+            let mut reply = accepted;
+            for storage in [0, 2] {
+                let Some(copy) = live.exchanged(SetResult::Matched(reply), 0, false) else {
+                    panic!("no copy of {write:?}");
+                };
+                assert_eq!((copy[8], copy[9]), (storage, 5));
+                assert_eq!(copy[10..87], write[10..87]);
+                assert_eq!(copy[88], report::checksum(&copy));
+                reply = answered(&copy);
+            }
+            // The driver hears about the write it sent.
+            let done = live.exchanged(SetResult::Matched(reply), 0, false);
+            assert_eq!(done, None);
+            assert_eq!(live.response, Some(accepted));
+            assert!(live.set.is_none());
+        }
+    }
+
+    #[test]
+    fn lighting_copy_limits() {
+        let red = report::build(0x9f, 0x0f, 0x02, &[1, 5, 1, 0, 0, 1, 255, 0, 0]);
+        // Already live, as the custom frame effect is.
+        let unsaved = report::build(0x9f, 0x0f, 0x02, &[0, 5, 1, 0, 0, 1, 255, 0, 0]);
+        let mut live_one = live();
+        sent(&mut live_one, unsaved);
+        let done = live_one.exchanged(SetResult::Matched(answered(&unsaved)), 0, false);
+        assert_eq!(done, None);
+        // A write the keyboard turned down gets no copy.
+        let mut live_two = live();
+        sent(&mut live_two, red);
+        let mut failed = red;
+        failed[0] = report::STATUS_FAILURE;
+        assert_eq!(
+            live_two.exchanged(SetResult::Matched(failed), 0, false),
+            None
+        );
+        assert_eq!(live_two.response, Some(failed));
+        // Nor does a keyboard without the flag.
+        let mut live_three = live();
+        live_three.started = true;
+        let plain = devices::device(0x02ba);
+        assert_eq!(live_three.set(1, red, plain), Some(red));
+        let done = live_three.exchanged(SetResult::Matched(answered(&red)), 0, false);
+        assert_eq!(done, None);
+    }
+
+    #[test]
+    fn lighting_copy_failures() {
+        let red = report::build(0x9f, 0x0f, 0x02, &[1, 5, 1, 0, 0, 1, 255, 0, 0]);
+        let accepted = answered(&red);
+        let mut live = live();
+        sent(&mut live, red);
+        let copy = live
+            .exchanged(SetResult::Matched(accepted), 0, false)
+            .unwrap();
+        // Busy is asked again, then given up on, and the answer stands.
+        let mut busy = copy;
+        busy[0] = report::STATUS_BUSY;
+        for _ in 1..QUERY_ATTEMPTS {
+            let again = live.exchanged(SetResult::Matched(busy), 0, false);
+            assert_eq!(again, Some(copy));
+        }
+        assert_eq!(live.exchanged(SetResult::Matched(busy), 0, false), None);
+        assert_eq!(live.response, Some(accepted));
+        // A copy that couldn't go out doesn't change the answer either.
+        live.response = None;
+        sent(&mut live, red);
+        live.exchanged(SetResult::Matched(accepted), 0, false);
+        assert_eq!(live.exchanged(SetResult::NotSent, 0, false), None);
+        assert_eq!(live.response, Some(accepted));
     }
 
     #[test]

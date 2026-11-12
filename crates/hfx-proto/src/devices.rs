@@ -112,6 +112,9 @@ pub struct OpenRazer {
     pub event_file_regex: Option<&'static str>,
     /// Transaction id OpenRazer uses for get_serial on this device.
     pub serial_transaction_id: u8,
+    /// An Fn lighting combination puts the keyboard on onboard slot 2, and
+    /// OpenRazer's saved effects don't show there on their own.
+    pub onboard_lighting: bool,
     /// Suffix of the /dev/input/by-id link our udev rule adds on receiver
     /// interface 1 so OpenRazer finds key presses (keyboards only). The full
     /// name is `hyperflux-next-<ID_PATH_TAG>-<suffix>`.
@@ -144,15 +147,17 @@ pub struct Device {
     /// Shorter than 6 ms only with bench results from the device.
     pub first_get_delay_us: u16,
     pub openrazer: Option<OpenRazer>,
-    /// The commands OpenRazer or OpenRGB send to this device. Anything
-    /// else is refused before it reaches the receiver.
+    /// The commands OpenRazer or OpenRGB send to this device, and the
+    /// settings recorded from Synapse on it. Anything else is refused
+    /// before it reaches the receiver.
     pub commands: &'static [Command],
 }
 
 // The Basilisk V3 Pro, its 35K model and the 35K's Phantom Green Edition
 // share their OpenRazer attributes and OpenRGB's 1x13 matrix. For 0f/03,
 // OpenRGB sends whole rows (5 bytes of header and 3 per LED) and OpenRazer
-// pads each row to 71.
+// pads each row to 71. The 35K's own list adds the settings recorded from
+// Synapse on it.
 const BASILISK_V3_PRO: &[Command] = &[
     cmd(0x00, 0x04, &[2]),
     cmd(0x00, 0x05, &[1]),
@@ -199,6 +204,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerNagaV2ProWireless",
             event_file_regex: None,
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: &[
@@ -244,6 +250,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBasiliskV3ProWireless",
             event_file_regex: Some(".*Razer_Basilisk_V3_Pro_000000000000-if0(1|2)-event-kbd"),
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: BASILISK_V3_PRO,
@@ -261,6 +268,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerCobraProWireless",
             event_file_regex: Some(".*usb-Razer_Razer_Cobra_Pro-if0(1|2)-event-kbd"),
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: &[
@@ -302,9 +310,48 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBasiliskV3Pro35KWireless",
             event_file_regex: Some(".*Razer_Basilisk_V3_Pro_35K_000000000000-if0(1|2)-event-kbd"),
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
-        commands: BASILISK_V3_PRO,
+        commands: &[
+            cmd(0x00, 0x04, &[2]),
+            cmd(0x00, 0x05, &[1]),
+            cmd(0x00, 0x81, &[2]),
+            cmd(0x00, 0x82, &[22]),
+            cmd(0x00, 0x84, &[2]),
+            cmd(0x00, 0x85, &[1]),
+            cmd(0x00, 0x86, &[2]),
+            cmd(0x02, 0x14, &[2]),
+            cmd(0x02, 0x16, &[2]),
+            cmd(0x02, 0x17, &[2]),
+            cmd(0x02, 0x22, &[2]),
+            cmd(0x02, 0x23, &[2]),
+            cmd(0x02, 0x94, &[2]),
+            cmd(0x02, 0x96, &[2]),
+            cmd(0x02, 0x97, &[2]),
+            cmd(0x02, 0xa2, &[2]),
+            cmd(0x02, 0xa3, &[2]),
+            cmd(0x04, 0x05, &[7]),
+            cmd(0x04, 0x06, &[38]),
+            cmd(0x04, 0x85, &[7]),
+            cmd(0x04, 0x86, &[38]),
+            cmd(0x07, 0x01, &[1]),
+            cmd(0x07, 0x03, &[2]),
+            cmd(0x07, 0x12, &[1]),
+            cmd(0x07, 0x13, &[3]),
+            cmd(0x07, 0x80, &[2]),
+            cmd(0x07, 0x81, &[1]),
+            cmd(0x07, 0x83, &[2]),
+            cmd(0x07, 0x84, &[2]),
+            cmd(0x07, 0x92, &[1]),
+            cmd(0x07, 0x93, &[3]),
+            cmd(0x0f, 0x02, &[6, 9, 12]),
+            cmd(0x0f, 0x03, &[44, 71]),
+            cmd(0x0f, 0x04, &[3]),
+            cmd(0x0f, 0x80, &[80]),
+            cmd(0x0f, 0x81, &[80]),
+            cmd(0x0f, 0x84, &[3]),
+        ],
     },
     Device {
         product_id: 0x00d7,
@@ -319,6 +366,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBasiliskV3Pro35KPhantomGreenEditionWireless",
             event_file_regex: None,
             serial_transaction_id: 0x1f,
+            onboard_lighting: false,
             key_event_link: None,
         }),
         commands: BASILISK_V3_PRO,
@@ -390,6 +438,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBlackWidowV3ProWireless",
             event_file_regex: Some(".*Razer_Razer_BlackWidow_V3_Pro(_\\d+)?(-if01)?-event-kbd"),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some("Razer_Razer_BlackWidow_V3_Pro-if01-event-kbd"),
         }),
         commands: &[
@@ -428,6 +477,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerDeathStalkerV2ProWireless",
             event_file_regex: Some(".*DSV2_Pro_000000000000-event-kbd"),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some("DSV2_Pro_000000000000-event-kbd"),
         }),
         commands: &[
@@ -463,6 +513,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerDeathStalkerV2ProTKLWireless",
             event_file_regex: Some(".*DSV2Pro_TKL_000000000000-if01-event-mouse"),
             serial_transaction_id: 0xff,
+            onboard_lighting: true,
             key_event_link: Some("DSV2Pro_TKL_000000000000-if01-event-mouse"),
         }),
         commands: &[
@@ -475,8 +526,14 @@ pub const DEVICES: &[Device] = &[
             cmd(0x03, 0x02, &[3]),
             cmd(0x03, 0x80, &[3]),
             cmd(0x03, 0x82, &[3]),
+            cmd(0x07, 0x03, &[2]),
+            cmd(0x07, 0x08, &[2]),
+            cmd(0x07, 0x0b, &[5]),
             cmd(0x07, 0x80, &[2]),
+            cmd(0x07, 0x83, &[2]),
             cmd(0x07, 0x84, &[2]),
+            cmd(0x07, 0x88, &[2]),
+            cmd(0x07, 0x8b, &[5]),
             cmd(0x0f, 0x02, &[6, 9, 12]),
             cmd(0x0f, 0x03, &[56, 71]),
             cmd(0x0f, 0x04, &[3]),
@@ -498,6 +555,7 @@ pub const DEVICES: &[Device] = &[
             class: "RazerBlackWidowV4MiniHyperSpeedWireless",
             event_file_regex: Some(".*Razer_BlackWidow_V4_Mini_(-if01)?-event-kbd"),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some("Razer_BlackWidow_V4_Mini_-if01-event-kbd"),
         }),
         commands: &[
@@ -564,6 +622,7 @@ pub const DEVICES: &[Device] = &[
                 ".*Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed(_\\d+)?(-if01)?-event-mouse",
             ),
             serial_transaction_id: 0xff,
+            onboard_lighting: false,
             key_event_link: Some(
                 "Razer_Razer_BlackWidow_V4_Tenkeyless_HyperSpeed-if01-event-mouse",
             ),
@@ -781,5 +840,24 @@ mod tests {
             check_command(device(0x0296).unwrap(), &short),
             Err(CommandRefusal::NotListed)
         );
+    }
+
+    #[test]
+    fn synapse_settings_per_model() {
+        // Recorded from Synapse on these two, and passed only for them: the
+        // other Basilisk V3 Pro models share the rest of the 35K's list.
+        let smart_dimming = report::build(0x1f, 0x07, 0x13, &[1, 1, 1]);
+        let charge_limit = report::build(0x1f, 0x07, 0x12, &[0xd0]);
+        let dim_lighting = report::build(0x9f, 0x07, 0x0b, &[0, 1, 2, 0x58, 0x14]);
+        let (mouse, keyboard) = (device(0x00cd).unwrap(), device(0x0296).unwrap());
+        assert_eq!(check_command(mouse, &smart_dimming), Ok(()));
+        assert_eq!(check_command(mouse, &charge_limit), Ok(()));
+        assert_eq!(check_command(keyboard, &dim_lighting), Ok(()));
+        for pid in [0x00ab, 0x00d7] {
+            let other = device(pid).unwrap();
+            let refused = Err(CommandRefusal::NotListed);
+            assert_eq!(check_command(other, &smart_dimming), refused, "{pid:04x}");
+            assert_eq!(check_command(other, &charge_limit), refused, "{pid:04x}");
+        }
     }
 }

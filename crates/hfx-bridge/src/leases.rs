@@ -98,6 +98,21 @@ impl Leases {
         )
     }
 
+    /// Takes the device for a battery probe. Between two OpenRazer reports
+    /// the burst window only keeps the device for OpenRazer's next one, and
+    /// that report can wait for the probe instead: an app drawing the mouse
+    /// would otherwise hold it for good. A report in flight or a client's
+    /// lease still keeps it.
+    pub fn take_for_probe(&mut self, rx: u64, lane: Lane) -> bool {
+        self.list.retain(|l| {
+            !(l.rx == rx
+                && l.lane == lane
+                && l.holder == Holder::OpenRazer
+                && l.expires != u64::MAX)
+        });
+        self.take_internal(rx, lane, &Holder::HyperFlux)
+    }
+
     /// After an internal exchange: keep for the burst window, or drop.
     pub fn after_internal(
         &mut self,
@@ -167,6 +182,35 @@ mod tests {
             conn,
             name: ClientName::new("Test").unwrap(),
         }
+    }
+
+    #[test]
+    fn probe_takes_idle_openrazer_burst() {
+        let mut leases = Leases::default();
+        assert!(leases.take_internal(1, Lane::Pointer, &Holder::OpenRazer));
+        // In flight: the probe waits.
+        assert!(!leases.take_for_probe(1, Lane::Pointer));
+        leases.after_internal(1, Lane::Pointer, &Holder::OpenRazer, true, 100);
+        // Waiting for OpenRazer's next report: the probe goes first.
+        assert!(leases.take_for_probe(1, Lane::Pointer));
+        assert_eq!(
+            leases.on_device(1, Lane::Pointer).unwrap().holder,
+            Holder::HyperFlux
+        );
+    }
+
+    #[test]
+    fn probe_leaves_client_lease() {
+        let mut leases = Leases::default();
+        assert!(matches!(
+            leases.acquire(1, Lane::Pointer, client(1), 5000),
+            Acquire::Granted(_)
+        ));
+        assert!(!leases.take_for_probe(1, Lane::Pointer));
+        assert_eq!(
+            leases.on_device(1, Lane::Pointer).unwrap().holder,
+            client(1)
+        );
     }
 
     #[test]

@@ -57,6 +57,8 @@ struct SimDevice {
     /// A read before the answer is ready gets busy, not the receiver's
     /// previous answer.
     busy_until_ready: bool,
+    /// Answers a write with its arguments, as the tested devices do.
+    echo: bool,
     silent: u32,
     misroute: u32,
     /// Answer times in microseconds to take in turn, instead of the lane's.
@@ -83,6 +85,7 @@ impl SimDevice {
             serial: format!("{}{port:08}", if mouse { "PM2342H1" } else { "IO2318K2" }),
             busy: 0,
             busy_until_ready: false,
+            echo: true,
             silent: 0,
             misroute: 0,
             answer_after: Vec::new(),
@@ -105,6 +108,9 @@ impl SimDevice {
             return None;
         }
         let mut r = *wire;
+        if !self.echo && !report::is_query(wire) {
+            r[report::ARGS..report::CHECKSUM].fill(0);
+        }
         if self.asleep {
             r[report::STATUS] = report::STATUS_TIMEOUT;
         } else if self.busy > 0 {
@@ -168,6 +174,10 @@ struct SimReceiver {
     unrouted: Vec<Report>,
     /// Whether it answers that query.
     slots: bool,
+    /// A keyboard request this soon after the pointer's answer was read
+    /// goes nowhere.
+    deaf_after_pointer: Duration,
+    pointer_answered: Option<Instant>,
 }
 
 impl SimReceiver {
@@ -222,7 +232,10 @@ impl SimReceiver {
                 return Ok(());
             }
         };
-        let Some(d) = self.lanes[lane].as_mut() else {
+        let deaf = self
+            .pointer_answered
+            .is_some_and(|at| at.elapsed() < self.deaf_after_pointer);
+        let Some(d) = self.lanes[lane].as_mut().filter(|_| lane == 0 || !deaf) else {
             return Ok(());
         };
         let turn = d
@@ -245,6 +258,9 @@ impl SimReceiver {
             Some((ready, answer, _)) if ready <= Instant::now() => {
                 self.last_answer = answer;
                 self.pending = None;
+                if answer[report::TRANSACTION_ID] == 0x1f {
+                    self.pointer_answered = Some(Instant::now());
+                }
             }
             Some((_, mut early, true)) => {
                 early[report::STATUS] = report::STATUS_BUSY;
@@ -434,6 +450,8 @@ impl Sim {
                 marker: Some(wire::INVENTORY_MARKER),
                 unrouted: Vec::new(),
                 slots: true,
+                deaf_after_pointer: Duration::ZERO,
+                pointer_answered: None,
             });
             world.plug(i);
         }
@@ -574,6 +592,17 @@ impl Sim {
     /// keyboard's sometimes do on hardware), or the previous answer.
     pub fn set_busy_until_ready(&self, receiver: usize, lane: Lane, on: bool) {
         self.with_device(receiver, lane, |d| d.busy_until_ready = on);
+    }
+
+    /// Whether the device answers a write with its arguments or with zeros.
+    pub fn set_echo(&self, receiver: usize, lane: Lane, on: bool) {
+        self.with_device(receiver, lane, |d| d.echo = on);
+    }
+
+    /// The receiver ignores a keyboard request sent within `window` of
+    /// the bridge reading the pointer's answer.
+    pub fn set_deaf_after_pointer(&self, receiver: usize, window: Duration) {
+        self.with(receiver, |r| r.deaf_after_pointer = window);
     }
 
     /// What the device answers its serial query with.
