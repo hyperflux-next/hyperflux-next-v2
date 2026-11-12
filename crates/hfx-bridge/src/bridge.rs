@@ -1059,7 +1059,7 @@ impl Bridge {
             }
         }
         for (key, lane) in start {
-            let started = self.leases.take_internal(key, lane, &Holder::HyperFlux)
+            let started = self.leases.take_for_probe(key, lane)
                 && self
                     .submit(
                         key,
