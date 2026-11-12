@@ -1496,7 +1496,9 @@ support pages answer scripts with a captcha.
 
 The command check is class, id and data size per device. Argument values are
 left to the firmware. That keeps the attack surface to what OpenRazer and
-OpenRGB send, without a table of hundreds of rules. A refused command is
+OpenRGB send, without a table of hundreds of rules. A setting OpenRazer
+doesn't offer joins a model's list only once it has been recorded from
+Synapse on that model and read back through the receiver. A refused command is
 logged and counted in `refused`, so a missing list entry doesn't look like a
 broken device.
 
