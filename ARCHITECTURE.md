@@ -1125,7 +1125,7 @@ Line budgets per part:
 
 | Part | Budget |
 | --- | --- |
-| hfx-bridge | 16,000 |
+| hfx-bridge | 16,500 |
 | hyperfluxctl | 9,000 |
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |
