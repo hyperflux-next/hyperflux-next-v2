@@ -218,6 +218,29 @@ def names(relations):
     return {re.split(r"[\s=<>(]", r.strip().strip("'\""), maxsplit=1)[0] for r in relations if r.strip()}
 
 
+
+def test_site_page():
+    project, site = makefile_var("PROJECT_URL"), makefile_var("SITE_URL")
+    page = subprocess.run([sys.executable, "-I", "scripts/site-page.py", "9.9.9", site, project], cwd=ROOT,
+                          capture_output=True, text=True, check=True).stdout
+    assert "Version 9.9.9," in page
+    hardware = read("docs/user/hardware.md")
+    rows = re.findall(r"(?m)^\| ([^|]+?) \| (?:mouse|keyboard) \| `1532:\w{4}` \| `1532:\w{4}` \| (\w+) \|", hardware)
+    assert rows
+    for name, tier in rows:
+        assert (f"<td>{name}</td>" in page) == (tier != "listed"), name
+    for target in {line.split()[0] for line in read("packaging/releases").splitlines()
+                   if line.strip() and not line.startswith("#")}:
+        assert {"arch": "Arch Linux", "ubuntu": "Ubuntu", "debian": "Debian", "fedora": "Fedora",
+                "opensuse": "openSUSE"}[target] in page, target
+    # Every link into the repository names a file it has.
+    for path in re.findall(rf'{re.escape(project)}/blob/main/([^"#]+)', page):
+        assert (ROOT / path).is_file(), path
+    for font in re.findall(r'url\("(fonts/[^"]+)"\)', page):
+        assert (ROOT / "packaging/site" / font).is_file(), font
+    assert (ROOT / "packaging/site/fonts/OFL.txt").is_file()
+    assert "github.io" not in page.replace(site, "")
+
 def test_arch_old_names():
     pkgbuild = read("packaging/arch/PKGBUILD")
     for part, old in TAKES_OVER.items():
