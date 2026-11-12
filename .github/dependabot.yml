@@ -28,6 +28,14 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # fedora-44.Containerfile builds the Fedora 44 packages and has to stay
+    # on 44 (likewise Ubuntu 26.10). Only their digests move, and a new
+    # release gets a file of its own.
+    ignore:
+      - dependency-name: library/fedora
+        update-types: ["version-update:semver-major"]
+      - dependency-name: library/ubuntu
+        update-types: ["version-update:semver-major"]
     groups:
       images:
         patterns: ["*"]
