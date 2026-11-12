@@ -2,6 +2,38 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.5
+
+Reboot after updating. This release changes the OpenRazer driver, and the
+old one stays loaded until you do. Meanwhile Doctor reports HFX-401.
+
+### Added
+
+- Apps can change the DeathStalker V2 Pro TKL's power saving and idle
+  dimming, as Synapse does.
+- The Basilisk V3 Pro 35K's Smart Dimming, scroll settings and charge
+  limit are open too.
+- The package site has a front page with the install line, the guides
+  and the devices.
+
+### Fixed
+
+- After a DeathStalker V2 Pro TKL Fn lighting shortcut, OpenRazer's
+  changes didn't show.
+- On a shared receiver, a keyboard request right after the mouse's answer
+  could get lost.
+- While an app drew lighting, the mouse's charging state could go minutes
+  without an update.
+- razerkbd and razermouse logged the bridge's error replies as "Invalid
+  Report Length".
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.4
 
 Fedora 45 came out two days before 1.0.3, and the site had no packages
