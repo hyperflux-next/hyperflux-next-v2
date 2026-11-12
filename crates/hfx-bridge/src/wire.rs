@@ -86,6 +86,86 @@ pub fn answer_key(lane: Lane, r: &Report) -> (Lane, [u8; 4]) {
     (lane, [r[2], r[3], r[report::CLASS], r[report::COMMAND]])
 }
 
+/// Whether two reports have the same data size, command and arguments
+/// (bytes 5 to 87). A device's answer to a write has its request's.
+#[must_use]
+pub fn same_arguments(a: &Report, b: &Report) -> bool {
+    a[report::DATA_SIZE..report::CHECKSUM] == b[report::DATA_SIZE..report::CHECKSUM]
+}
+
+/// The receiver loses a keyboard request sent too soon after an exchange
+/// with the pointer. Nothing answers it, and the reads give up. With the
+/// Basilisk V3 Pro 35K and the DeathStalker V2 Pro TKL, keyboard frames
+/// sent through OpenRazer 2 ms after the mouse's all failed, 4 ms after a
+/// fifth of them failed, 5 ms after 2 % and 6 ms after none. Those times
+/// start when the mouse's answer reached the app, a little after the bridge
+/// read it, and 8 ms leaves a margin. A pointer request right after the
+/// keyboard's was always answered. The gap starts here (`Gap`).
+pub const KEYBOARD_AFTER_POINTER_US: u64 = 8_000;
+
+/// The most the gap grows to, a step at a time.
+pub const KEYBOARD_AFTER_POINTER_MAX_US: u64 = 16_000;
+pub const GAP_STEP_US: u64 = 1_000;
+/// It grows when `GAP_LOST` keyboard requests sent at the end of the gap
+/// go unanswered among `GAP_WINDOW` of them.
+pub const GAP_WINDOW: u8 = 50;
+pub const GAP_LOST: u8 = 2;
+/// Sent at the end of the gap: within this of it.
+pub const GAP_TIGHT: Duration = Duration::from_millis(2);
+/// A keyboard that answered this recently is awake and in range, so a
+/// request it doesn't answer was lost on the way.
+pub const GAP_AWAKE: Duration = Duration::from_secs(1);
+
+/// The wait between a pointer exchange and a keyboard request, one per
+/// receiver. A receiver that needs longer than the tested one loses
+/// keyboard requests sent at the end of the wait, and then it grows by a
+/// step. It never shrinks while the bridge runs, since trying a shorter
+/// one would cost answers. One stray loss on the radio isn't enough.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Gap {
+    pub us: u64,
+    /// Keyboard requests sent at the end of the gap, and of those lost.
+    counts: [u8; 2],
+}
+
+impl Default for Gap {
+    fn default() -> Self {
+        Self {
+            us: KEYBOARD_AFTER_POINTER_US,
+            counts: [0; 2],
+        }
+    }
+}
+
+impl Gap {
+    /// How long after an exchange with lane `before` ended a request for
+    /// `next` may go out.
+    #[must_use]
+    pub const fn wait(&self, before: Lane, next: Lane) -> Duration {
+        match (before, next) {
+            (Lane::Pointer, Lane::Keyboard) => Duration::from_micros(self.us),
+            _ => Duration::ZERO,
+        }
+    }
+
+    /// A keyboard request sent at the end of the gap, and whether it was
+    /// lost. The new gap when it grew.
+    pub fn record(&mut self, lost: bool) -> Option<u64> {
+        let [sent, missed] = &mut self.counts;
+        *sent += 1;
+        *missed += u8::from(lost);
+        if *missed >= GAP_LOST && self.us < KEYBOARD_AFTER_POINTER_MAX_US {
+            self.us = (self.us + GAP_STEP_US).min(KEYBOARD_AFTER_POINTER_MAX_US);
+            self.counts = [0; 2];
+            return Some(self.us);
+        }
+        if *sent >= GAP_WINDOW {
+            self.counts = [0; 2];
+        }
+        None
+    }
+}
+
 /// The response as the caller should see it: with its own transaction id.
 #[must_use]
 pub fn restore(response: &Report, transaction_id: u8) -> Report {
@@ -244,6 +324,8 @@ pub trait FeaturePipe {
 /// never comes later than the fifth of the 2.x module's would. With
 /// `reread_busy` (all but some bench queries) a busy answer is kept and the
 /// reads go on. It comes back unless something else matches in that time.
+/// A reply with the arguments of `stale` is skipped like one that doesn't
+/// match.
 /// Returns the reads made, and how many of them followed a reply that
 /// didn't match and how many a busy one.
 pub fn run_exchange(
@@ -297,6 +379,9 @@ pub fn run_exchange(
             }
             Err(_) => (transfer_failed, wait) = (true, GET_INTERVAL_US),
             Ok(()) if !matches(wire, &response) => after = Some(0),
+            Ok(()) if timing.stale.is_some_and(|s| same_arguments(&s, &response)) => {
+                after = Some(0);
+            }
             Ok(()) if timing.reread_busy && response[report::STATUS] == report::STATUS_BUSY => {
                 (busy, after) = (Some(response), Some(1));
             }
@@ -665,6 +750,7 @@ mod tests {
             first_get_delay_us,
             get_interval_us,
             reread_busy: false,
+            stale: None,
         }
     }
 
@@ -701,6 +787,61 @@ mod tests {
         };
         let no_reply = Err(Failure::MayHaveBeenSent(Uncertain::NoReply));
         assert_eq!(run(vec![Ok(ours)], late).0, (no_reply, 0, [0, 0]));
+    }
+
+    #[test]
+    fn gap_grows_on_losses() {
+        let mut gap = Gap::default();
+        // One loss in a window doesn't count.
+        for i in 0..GAP_WINDOW {
+            assert_eq!(gap.record(i == 3), None);
+        }
+        assert_eq!(gap.record(true), None);
+        assert_eq!(gap.record(true), Some(9_000));
+        let wait = gap.wait(Lane::Pointer, Lane::Keyboard);
+        assert_eq!(wait, Duration::from_millis(9));
+        assert_eq!(gap.wait(Lane::Keyboard, Lane::Pointer), Duration::ZERO);
+        // Answered requests never take it back, and it stops at 16 ms.
+        for _ in 0..1000 {
+            gap.record(false);
+        }
+        assert_eq!(gap.us, 9_000);
+        for _ in 0..100 {
+            gap.record(true);
+        }
+        assert_eq!(gap.us, 16_000);
+    }
+
+    #[test]
+    fn stale_row_skipped() {
+        let row = |n: u8| {
+            route(
+                &report::build(0xff, 0x0f, 0x03, &[0, 0, n, 0, 16]),
+                Lane::Keyboard,
+            )
+        };
+        let answer = |n: u8| {
+            let mut a = row(n);
+            a[0] = report::STATUS_SUCCESS;
+            a
+        };
+        let mut zeros = answer(1);
+        zeros[report::ARGS..report::CHECKSUM].fill(0);
+        zeros[report::CHECKSUM] = report::checksum(&zeros);
+        let run = |second, timing| {
+            let replies = vec![Ok(answer(0)), Ok(second)];
+            run_exchange(&mut Script { sets: 0, replies }, &row(1), timing)
+        };
+        let stale = Timing {
+            stale: Some(answer(0)),
+            ..timing(1000, 0)
+        };
+        assert_eq!(run(answer(1), stale), (Ok(answer(1)), 2, [1, 0]));
+        // An answer without the request's arguments still counts.
+        assert_eq!(run(zeros, stale).0, Ok(zeros));
+        // Without it, the previous row's answer passes for this one's.
+        assert_eq!(run(answer(1), timing(1000, 0)).0, Ok(answer(0)));
+        assert!(same_arguments(&row(1), &answer(1)) && !same_arguments(&row(0), &row(1)));
     }
 
     #[test]

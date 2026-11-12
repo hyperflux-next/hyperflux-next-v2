@@ -211,6 +211,9 @@ pub struct Bridge {
     /// By receiver id, lane and product id, so they outlast replugs.
     exchanges: BTreeMap<(String, Lane, u16), Exchanges>,
     waits: crate::waits::Waits,
+    /// OpenRazer requests that came while the bridge's own battery query
+    /// had the device: receiver, lane, virtual device and the request.
+    behind_probe: Vec<(u64, Lane, u64, Report)>,
 }
 
 /// What the bridge runs with, besides its socket.
@@ -296,6 +299,7 @@ impl Bridge {
             pretend_suspend,
             exchanges: BTreeMap::new(),
             waits: crate::waits::Waits::new(state_dir.as_deref()),
+            behind_probe: Vec::new(),
         };
         bridge.suspended_ms = bridge.suspend_gap();
         bridge.watchdog = notify::watchdog_interval_ms().map(|i| (i, bridge.now + i));
@@ -654,6 +658,9 @@ impl Bridge {
             }
             self.drop_vdev(d.vdev.take());
         }
+        self.after_probe(|r, _| r == key);
+        // Nothing is left to answer the rest: their devices have gone.
+        self.behind_probe.retain(|&(r, ..)| r != key);
     }
 
     pub(crate) fn revoke(&mut self, token: String, reason: ErrorCode) {
@@ -847,6 +854,7 @@ impl Bridge {
                     first_get_delay_us,
                     get_interval_us: get_interval_us.map_or(0, |i| i.get()),
                     reread_busy,
+                    stale: None,
                 },
                 repeat_wait_us: learning.map_or(0, |_| learned.from_us),
                 unrouted,
@@ -881,7 +889,15 @@ impl Bridge {
                 rereads,
                 elapsed_us,
                 fresh,
+                gap_us,
             } => {
+                if let (Some(us), Some(r)) = (gap_us, self.receivers.get(&pending.rx)) {
+                    let ms = us / 1000;
+                    eprintln!(
+                        "receiver {}: keyboard requests lost after the pointer's; they now wait {ms} ms",
+                        r.id
+                    );
+                }
                 self.count(&pending, &result, gets, rereads);
                 self.exchanged(pending, &request, result, gets, elapsed_us, fresh);
             }
@@ -1086,6 +1102,37 @@ impl Bridge {
     fn release_internal(&mut self, rx: u64, lane: Lane, holder: &Holder) {
         self.leases
             .after_internal(rx, lane, holder, false, self.now);
+        if *holder == Holder::HyperFlux {
+            self.after_probe(|r, l| (r, l) == (rx, lane));
+        }
+    }
+
+    /// Sends the OpenRazer requests that waited for a battery query, or
+    /// answers "not sent" for those whose device has gone. One whose device
+    /// can't be found yet, on a receiver being retired, waits for
+    /// `retire` to tear the device down.
+    fn after_probe(&mut self, which: impl Fn(u64, Lane) -> bool) {
+        let (go, wait): (Vec<_>, Vec<_>) = std::mem::take(&mut self.behind_probe)
+            .into_iter()
+            .partition(|&(rx, lane, ..)| which(rx, lane));
+        self.behind_probe = wait;
+        let now = self.now;
+        for (rx, lane, live, request) in go {
+            match self.with_live(live, |_, _| ()).map(|(_, owner)| owner) {
+                Some(owner) if owner == Some((rx, lane)) => {
+                    self.uhid_send(rx, lane, live, request);
+                }
+                Some(_) => {
+                    self.with_live(live, |l, _| {
+                        l.exchanged(vdev::SetResult::NotSent, now, false)
+                    });
+                }
+                None if !self.receivers.contains_key(&rx) => {
+                    self.behind_probe.push((rx, lane, live, request));
+                }
+                None => {}
+            }
+        }
     }
 
     fn probe_done(&mut self, p: &Pending, charge: bool, response: Option<Report>) {
@@ -1554,6 +1601,13 @@ impl Bridge {
     }
 
     fn uhid_send(&mut self, rx: u64, lane: Lane, live: u64, request: Report) {
+        // A battery query takes a few milliseconds. Turning OpenRazer away
+        // for it would cost a frame of drawn lighting.
+        let ours = self.leases.on_device(rx, lane);
+        if ours.is_some_and(|l| l.holder == Holder::HyperFlux) {
+            self.behind_probe.push((rx, lane, live, request));
+            return;
+        }
         let sent = self.leases.take_internal(rx, lane, &Holder::OpenRazer)
             && self
                 .submit(rx, lane, request, OWN_TIMEOUT_MS, 0, Origin::Uhid { live })
