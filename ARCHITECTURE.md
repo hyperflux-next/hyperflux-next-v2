@@ -153,6 +153,18 @@ it waits 10 ms. No read starts more than 40 ms after the first, the span of
 five reads 10 ms apart. Bench may read at other intervals (section 4,
 "Bench").
 
+A keyboard request goes out no sooner than 8 ms after an exchange with
+the pointer ended (`wire::Gap`). Sent earlier, it's lost: nothing answers
+it and the reads run out. That wait comes off the exchange's own time. A
+pointer request after the keyboard's goes straight out.
+
+Another receiver may need longer. Each receiver keeps its own gap. When 2
+of 50 keyboard requests sent at the end of it get no answer, from a
+keyboard that answered within the last second, it grows by 1 ms, up to
+16 ms, and the bridge logs the new value. It never shrinks while the
+bridge runs: the only way to find out whether a shorter gap works is to
+lose answers to it. A restart starts again at 8 ms.
+
 The wait starts at `first_get_delay_us` from the device catalog:
 
 - 3 ms for the Basilisk V3 Pro 35K
@@ -183,12 +195,16 @@ the wait drops by 0.5 ms, and if more than 5 needed another read, it grows
 by 0.5 ms. It stays between 2 and 8 ms.
 
 An early read gets the previous answer. To the match rules, that answer
-passes for one to an identical request. If the previous answer had the same
-key (`wire::answer_key`), or is unknown, the exchange therefore waits at
-least the catalog's wait and is left out of the count, a call the exchange
-thread makes because it knows what the receiver answered last. A busy
-answer at the first read counts as too early, the same as needing a second
-read. An asleep answer counts neither way.
+passes for one to any request with the same key (`wire::answer_key`).
+Devices answer a write with its own arguments, though. Say the previous
+answer was a success that carried its write's arguments, and the next
+request is a write with other ones (the next row of a frame). Its answer
+won't have the old arguments, so a reply that has them is read past.
+Otherwise, when the previous answer had the same key or is unknown, the
+exchange waits at least the catalog's wait. It's left out of the count.
+The exchange thread makes these calls because it knows what the receiver
+answered last. A busy answer at the first read counts as too early, the
+same as needing a second read. An asleep answer counts neither way.
 
 The wait has no effect on the match rules, the busy handling, the re-reads
 or the deadline. The snapshot carries it as `first_get`, with `saved_us`
@@ -820,7 +836,11 @@ hold a value, stops the query for the device until it pairs again. A "not
 supported" for 07/80 stops both queries. Either ends the charge watch.
 
 The bridge asks when no one else holds the device's lease, and holds it as
-`HyperFlux` for the length of the probe. A non-matching or busy
+`HyperFlux` for the length of the probe. An OpenRazer request that comes
+meanwhile waits for the probe to finish, a few milliseconds, rather than
+failing with "not sent". Drawn lighting would lose a frame to it
+otherwise. A client asking for the lease meanwhile is still told it's
+taken. A non-matching or busy
 answer is retried after 2 s, 10 s and 60 s. A 0x04 answer stops the probes
 until the next evidence. Probes never write.
 
@@ -946,7 +966,12 @@ subsystem `drivers`). Each qualified, available route of a device with an
 - Queries are retried up to 5 times on BUSY or on a transaction, class or
   command mismatch. OpenRazer gets the answer only on status 0x02 with all
   three matching.
-- Writes are sent once and returned byte for byte.
+- Writes are sent once and returned byte for byte. On a keyboard with
+  `onboard_lighting` in `devices.toml`, an effect or brightness that
+  OpenRazer saves to slot 1 is followed by the same write with storage 0
+  (what's on show) and storage 2 (what comes back at power-on). An Fn
+  lighting combination leaves the keyboard on slot 2, where the saved write
+  changes nothing on the keys. OpenRazer gets the saved write's answer.
 - A 0x04 reply recycles the device. For the next 60 s it is probed again at
   least every 2 s. That holds for the tested devices. For the others the
   bridge first asks 07/80 itself, and recycles when that gets 0x04 too, or
@@ -1100,7 +1125,7 @@ Line budgets per part:
 
 | Part | Budget |
 | --- | --- |
-| hfx-bridge | 16,000 |
+| hfx-bridge | 16,500 |
 | hyperfluxctl | 9,000 |
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |
@@ -1415,12 +1440,29 @@ busy answers too. At the catalog waits, about 5 % of the mouse's answers and
 17 % of the keyboard's were busy at first.
 
 The bridge learns each device's wait, starting from the catalog's, because
-bench measured one unit each of two models. A request identical to the one
-before never waits less than the catalog's value, since an early read
-would take the previous answer for its own. Learned waits survive restarts
+bench measured one unit each of two models. A request with the same key as
+the one before waits at least the catalog's value. An early read would
+take the previous answer for its own. Writes with different arguments are
+the exception. Learned waits survive restarts
 because real traffic answers more slowly than bench's query. After a couple
 of hours' use they had gone from 3 to 5.0 ms on the mouse, and from 4 to
 5.5 ms on the keyboard.
+
+Drawing both devices through OpenRazer found two more limits. Keyboard
+frames sent straight after the mouse's lost their first row, and OpenRazer
+then dropped the rest of the frame. Counted from the mouse's D-Bus reply,
+all of them failed up to 2 ms later, a fifth at 4 ms, 2 % at 5 ms and none
+at 6 ms. Mouse frames after the keyboard's never failed. The bridge counts
+its 8 ms from its own read of the pointer's answer, which comes a little
+before that reply. With that wait, 126 keyboard frames sent straight after
+the mouse's all went through, and so did 126 sent 2 ms after.
+
+The six rows of a keyboard frame share a key. Each one waited the
+catalog's 4 ms before its first read, and a frame took 33 ms through
+OpenRazer. With the arguments compared, the rows waited the learned 2 ms
+and every one was answered at the first read. A frame took 22.5 ms. Sent
+back to back, mouse then keyboard, both devices drew 29.9 frames a second
+and no keyboard frame failed.
 
 The snapshot counts each device's exchanges and re-reads. A report from
 another unit then shows whether these rules fit it.
@@ -1454,7 +1496,9 @@ support pages answer scripts with a captcha.
 
 The command check is class, id and data size per device. Argument values are
 left to the firmware. That keeps the attack surface to what OpenRazer and
-OpenRGB send, without a table of hundreds of rules. A refused command is
+OpenRGB send, without a table of hundreds of rules. A setting OpenRazer
+doesn't offer joins a model's list only once it has been recorded from
+Synapse on that model and read back through the receiver. A refused command is
 logged and counted in `refused`, so a missing list entry doesn't look like a
 broken device.
 

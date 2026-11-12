@@ -245,6 +245,21 @@ fn set_acked_before_exchange() {
 }
 
 #[test]
+fn saved_effect_also_goes_live() {
+    let rig = Rig::new();
+    let keyboard = rig.device(0x0296);
+    let before = rig.h.sim.requests(0, Lane::Keyboard).len();
+    let red = report::build(0x9f, 0x0f, 0x02, &[1, 5, 1, 0, 0, 1, 255, 0, 0]);
+    let data = keyboard.query(1, &red);
+    assert_eq!((data[0], data[8]), (2, 1));
+    let sent = rig.h.sim.requests(0, Lane::Keyboard);
+    assert_eq!(sent.len(), before + 3);
+    assert_eq!(sent[before], red);
+    assert_eq!(sent[before + 1][8..17], [0, 5, 1, 0, 0, 1, 255, 0, 0]);
+    assert_eq!(sent[before + 2][8..17], [2, 5, 1, 0, 0, 1, 255, 0, 0]);
+}
+
+#[test]
 fn unknown_command_refused() {
     let rig = Rig::new();
     let mouse = rig.device(0x00cd);
@@ -593,4 +608,38 @@ fn every_catalog_device() {
         }
         c.release_lease(&lease).unwrap();
     }
+}
+
+#[test]
+fn requests_wait_for_battery_query() {
+    // The mouse rests on the mat, then moves. 3 s after it stops, the
+    // bridge asks whether it's still charging. Meanwhile OpenRazer asks it
+    // something 30 ms after each answer, and every query takes 30 ms.
+    let rig = Rig::new();
+    let mouse = rig.device(0x00cd);
+    let charging = || rig.h.shown(0, Lane::Pointer).is_some_and(|b| b.charging);
+    common::wait_for(5, charging);
+    std::thread::sleep(Duration::from_millis(5_200));
+    rig.h.sim.set_motion(0, 1000);
+    std::thread::sleep(Duration::from_millis(500));
+    rig.h.sim.set_motion(0, 0);
+    rig.h.sim.set_answer_after(0, Lane::Pointer, &[30_000]);
+    let firmware = report::build(0x1f, 0x00, 0x81, &[0, 0]);
+    let battery_queries = || {
+        let sent = rig.h.sim.requests(0, Lane::Pointer);
+        sent.iter().filter(|r| r[6] == 0x07).count()
+    };
+    let before = battery_queries();
+    let start = Instant::now();
+    let mut answers = Vec::new();
+    for id in (10..).step_by(2) {
+        answers.push(mouse.query(id, &firmware));
+        std::thread::sleep(Duration::from_millis(30));
+        if start.elapsed() > Duration::from_secs(6) {
+            break;
+        }
+    }
+    assert!(battery_queries() > before, "the bridge never asked");
+    let turned_away = answers.iter().filter(|a| a[0] != 2).count();
+    assert_eq!(turned_away, 0);
 }

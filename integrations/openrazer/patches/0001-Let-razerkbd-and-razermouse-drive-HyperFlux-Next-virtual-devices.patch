@@ -12,9 +12,10 @@ and with a product id the driver already lists for USB. HyperFlux Next's
 udev rules leave /dev/uhid to the hyperflux-keeper group.
 
 The bridge reports a missing response in-band ("HFXNERR1"). The drivers
-return it as EAGAIN (not sent) or ENOTRECOVERABLE (may have been sent), a
-mismatched response as ENOTRECOVERABLE, and for these devices the sysfs
-handlers return the first error instead of ignoring it.
+return it as EAGAIN (not sent) or ENOTRECOVERABLE (may have been sent),
+without printing it as an invalid report, and a mismatched response as
+ENOTRECOVERABLE. For these devices the sysfs handlers return the first
+error instead of ignoring it.
 
 Nothing sends the device-mode command or touches autosuspend without a
 USB device. Both modules carry hyperflux_native_transport, as a modinfo
@@ -27,7 +28,7 @@ it.
 Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1).
 
 diff --git a/driver/razercommon.c b/driver/razercommon.c
-index 4e8548a..4208a5e 100644
+index 4e8548a..429b51b 100644
 --- a/driver/razercommon.c
 +++ b/driver/razercommon.c
 @@ -220,6 +220,10 @@ int razer_send_control_msg_old_device(struct usb_device *usb_dev,void const *dat
@@ -210,7 +211,7 @@ index 54651a9..0d47cf0 100644
  // Convenience functions
  unsigned char clamp_u8(unsigned char value, unsigned char min, unsigned char max);
 diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
-index 5d9e2bd..5cad825 100644
+index 5d9e2bd..d6657b5 100644
 --- a/driver/razerkbd_driver.c
 +++ b/driver/razerkbd_driver.c
 @@ -28,6 +28,12 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
@@ -249,7 +250,7 @@ index 5d9e2bd..5cad825 100644
      razer_get_report_params(device->usb_dev, &report_index, &response_index, &wait_min, &wait_max);
      return razer_send_control_msg(device->usb_dev, request, report_index, wait_min, wait_max);
  }
-@@ -437,14 +452,17 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
+@@ -437,17 +452,23 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
  /**
   * Function to send to device, get response, and actually check the response
   */
@@ -268,8 +269,15 @@ index 5d9e2bd..5cad825 100644
 +        err = razer_hyperflux_get_report(device->hdev, request, response);
      mutex_unlock(&device->lock);
      if (err) {
-         print_erroneous_report(response, "razerkbd", "Invalid Report Length");
-@@ -456,7 +474,7 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
+-        print_erroneous_report(response, "razerkbd", "Invalid Report Length");
++        // For a HyperFlux device the errno already says whether the report
++        // went out, and the response is the bridge's note, not a report
++        if (device->usb_dev)
++            print_erroneous_report(response, "razerkbd", "Invalid Report Length");
+         return err;
+     }
+ 
+@@ -456,7 +477,7 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
          response->command_class != request->command_class ||
          response->command_id.id != request->command_id.id) {
          print_erroneous_report(response, "razerkbd", "Response doesn't match request");
@@ -278,7 +286,7 @@ index 5d9e2bd..5cad825 100644
      }
  
      switch (response->status) {
-@@ -478,6 +496,19 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
+@@ -478,6 +499,19 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
      return 0;
  }
  
@@ -298,7 +306,7 @@ index 5d9e2bd..5cad825 100644
  /**
   * Reads the physical layout of the keyboard.
   *
-@@ -647,7 +678,7 @@ static void razer_set_device_mode(struct razer_kbd_device *device, unsigned char
+@@ -647,7 +681,7 @@ static void razer_set_device_mode(struct razer_kbd_device *device, unsigned char
          return;
      }
  
@@ -307,7 +315,7 @@ index 5d9e2bd..5cad825 100644
  }
  
  /**
-@@ -4970,15 +5001,27 @@ static int razer_kbd_input_mapping(struct hid_device *hdev, struct hid_input *hi
+@@ -4970,15 +5004,27 @@ static int razer_kbd_input_mapping(struct hid_device *hdev, struct hid_input *hi
  
  static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *intf, struct hid_device *hdev)
  {
@@ -341,7 +349,7 @@ index 5d9e2bd..5cad825 100644
  }
  
  /**
-@@ -4987,13 +5030,16 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
+@@ -4987,13 +5033,16 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
  static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
  {
      int retval = 0;
@@ -361,7 +369,7 @@ index 5d9e2bd..5cad825 100644
          return -ENOMEM;
      }
  
-@@ -5001,7 +5047,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5001,7 +5050,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
      razer_kbd_init(dev, intf, hdev);
  
      // Other interfaces are actual key-emitting devices
@@ -370,7 +378,7 @@ index 5d9e2bd..5cad825 100644
          // If the currently bound device is the control (mouse) interface
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
-@@ -5012,7 +5058,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5012,7 +5061,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
  
@@ -379,7 +387,7 @@ index 5d9e2bd..5cad825 100644
  
          case USB_DEVICE_ID_RAZER_NOSTROMO:
              CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
-@@ -5498,10 +5544,11 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5498,10 +5547,11 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
          // Set device to regular mode, not driver mode
          // When the daemon discovers the device it will instruct it to enter driver mode
          // Tartarus Pro resets when it receives this command
@@ -393,7 +401,7 @@ index 5d9e2bd..5cad825 100644
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_super);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_tab);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_f4);
-@@ -5521,7 +5568,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5521,7 +5571,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
      }
  
      // Leave autosuspend on for laptops
@@ -402,7 +410,7 @@ index 5d9e2bd..5cad825 100644
          usb_disable_autosuspend(usb_dev);
      }
  
-@@ -5540,13 +5587,11 @@ exit_free:
+@@ -5540,13 +5590,11 @@ exit_free:
  static void razer_kbd_disconnect(struct hid_device *hdev)
  {
      struct razer_kbd_device *dev;
@@ -417,7 +425,7 @@ index 5d9e2bd..5cad825 100644
          // If the currently bound device is the control (mouse) interface
          device_remove_file(&hdev->dev, &dev_attr_version);
          device_remove_file(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
-@@ -5557,7 +5602,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -5557,7 +5605,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
          device_remove_file(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
          device_remove_file(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
  
@@ -426,7 +434,7 @@ index 5d9e2bd..5cad825 100644
  
          case USB_DEVICE_ID_RAZER_NOSTROMO:
              device_remove_file(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
-@@ -6039,7 +6084,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -6039,7 +6087,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
              device_remove_file(&hdev->dev, &dev_attr_macro_led_effect);              // Change macro LED effect (static, flashing)
              break;
          }
@@ -435,7 +443,7 @@ index 5d9e2bd..5cad825 100644
          device_remove_file(&hdev->dev, &dev_attr_key_super);
          device_remove_file(&hdev->dev, &dev_attr_key_alt_tab);
          device_remove_file(&hdev->dev, &dev_attr_key_alt_f4);
-@@ -6047,7 +6092,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -6047,7 +6095,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
  
      hid_hw_stop(hdev);
      kfree(dev);
@@ -444,7 +452,7 @@ index 5d9e2bd..5cad825 100644
  }
  
  /**
-@@ -6196,6 +6241,8 @@ static const struct hid_device_id razer_devices[] = {
+@@ -6196,6 +6244,8 @@ static const struct hid_device_id razer_devices[] = {
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_HUNTSMAN_V3_PRO_8KHZ) },
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2024) },
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2025) },
@@ -466,7 +474,7 @@ index 36a66ab..62d4fb0 100644
      struct mutex lock;
      unsigned char usb_interface_protocol;
 diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
-index 36a58a3..bab2c10 100644
+index 36a58a3..957165d 100644
 --- a/driver/razermouse_driver.c
 +++ b/driver/razermouse_driver.c
 @@ -32,6 +32,12 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
@@ -482,7 +490,7 @@ index 36a58a3..bab2c10 100644
  
  /**
   * Send report to the mouse
-@@ -118,14 +124,17 @@ static int razer_get_report(struct usb_device *usb_dev, struct razer_report *req
+@@ -118,17 +124,23 @@ static int razer_get_report(struct usb_device *usb_dev, struct razer_report *req
  /**
   * Function to send to device, get response, and actually check the response
   */
@@ -501,8 +509,15 @@ index 36a58a3..bab2c10 100644
 +        err = razer_hyperflux_get_report(device->hdev, request, response);
      mutex_unlock(&device->lock);
      if (err) {
-         print_erroneous_report(response, "razermouse", "Invalid Report Length");
-@@ -137,7 +146,7 @@ static int razer_send_payload(struct razer_mouse_device *device, struct razer_re
+-        print_erroneous_report(response, "razermouse", "Invalid Report Length");
++        // For a HyperFlux device the errno already says whether the report
++        // went out, and the response is the bridge's note, not a report
++        if (device->usb_dev)
++            print_erroneous_report(response, "razermouse", "Invalid Report Length");
+         return err;
+     }
+ 
+@@ -137,7 +149,7 @@ static int razer_send_payload(struct razer_mouse_device *device, struct razer_re
          response->command_class != request->command_class ||
          response->command_id.id != request->command_id.id) {
          print_erroneous_report(response, "razermouse", "Response doesn't match request");
@@ -511,7 +526,7 @@ index 36a58a3..bab2c10 100644
      }
  
      switch (response->status) {
-@@ -159,6 +168,19 @@ static int razer_send_payload(struct razer_mouse_device *device, struct razer_re
+@@ -159,6 +171,19 @@ static int razer_send_payload(struct razer_mouse_device *device, struct razer_re
      return 0;
  }
  
@@ -531,7 +546,7 @@ index 36a58a3..bab2c10 100644
  /*
   * Specific functions for ancient devices
   *
-@@ -6010,17 +6032,30 @@ static int razer_input_configured(struct hid_device *hdev,
+@@ -6010,17 +6035,30 @@ static int razer_input_configured(struct hid_device *hdev,
   */
  static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interface *intf, struct hid_device *hdev)
  {
@@ -568,7 +583,7 @@ index 36a58a3..bab2c10 100644
  
      // Get a "random" integer
      get_random_bytes(&rand_serial, sizeof(unsigned int));
-@@ -6054,14 +6089,17 @@ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interfac
+@@ -6054,14 +6092,17 @@ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interfac
  static int razer_mouse_probe(struct hid_device *hdev, const struct hid_device_id *id)
  {
      int retval = 0;
@@ -588,7 +603,7 @@ index 36a58a3..bab2c10 100644
          return -ENOMEM;
      }
  
-@@ -7185,12 +7223,10 @@ exit_free:
+@@ -7185,12 +7226,10 @@ exit_free:
  static void razer_mouse_disconnect(struct hid_device *hdev)
  {
      struct razer_mouse_device *dev;
@@ -602,7 +617,7 @@ index 36a58a3..bab2c10 100644
          device_remove_file(&hdev->dev, &dev_attr_version);
          device_remove_file(&hdev->dev, &dev_attr_test);
          device_remove_file(&hdev->dev, &dev_attr_firmware_version);
-@@ -7198,7 +7234,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
+@@ -7198,7 +7237,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
          device_remove_file(&hdev->dev, &dev_attr_device_serial);
          device_remove_file(&hdev->dev, &dev_attr_device_mode);
  
@@ -611,7 +626,7 @@ index 36a58a3..bab2c10 100644
          case USB_DEVICE_ID_RAZER_ABYSSUS_ELITE_DVA_EDITION:
          case USB_DEVICE_ID_RAZER_ABYSSUS_ESSENTIAL:
              device_remove_file(&hdev->dev, &dev_attr_poll_rate);
-@@ -8270,7 +8306,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
+@@ -8270,7 +8309,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
      hrtimer_cancel(&dev->repeat_timer);
  
      kfree(dev);
@@ -620,7 +635,7 @@ index 36a58a3..bab2c10 100644
  }
  
  /**
-@@ -8390,6 +8426,8 @@ static const struct hid_device_id razer_devices[] = {
+@@ -8390,6 +8429,8 @@ static const struct hid_device_id razer_devices[] = {
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_VERTICAL_EDITION_WIRED) },
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_WIRED) },
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_WIRELESS) },

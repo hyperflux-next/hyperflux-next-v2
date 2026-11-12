@@ -140,6 +140,10 @@ pub struct Timing {
     /// Read on after a busy answer, until another answer or the time the
     /// 2.x module's five took (ARCHITECTURE.md, section 10).
     pub reread_busy: bool,
+    /// The receiver's last answer, when it answered the same command with
+    /// other arguments. A reply with its arguments is read past
+    /// (`exchange::Worker`).
+    pub stale: Option<Report>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "hfx-bridge"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "getrandom",
  "hfx-proto",
@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "hfx-proto"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "getrandom",
  "proptest",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "hyperfluxctl"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "hfx-proto",
  "rustix",
