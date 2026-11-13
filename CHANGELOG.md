@@ -4,6 +4,10 @@ Each section is also the release's notes on GitHub.
 
 ## 1.0.6
 
+On Fedora and openSUSE, Doctor reports HFX-401 after the update until the
+next boot, which installs the rebuilt driver. The devices keep working
+meanwhile.
+
 ### Added
 
 - Doctor's HFX-401 names the kernel the driver was built for, and what to
