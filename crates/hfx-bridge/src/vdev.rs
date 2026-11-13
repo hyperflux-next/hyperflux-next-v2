@@ -8,7 +8,9 @@
 //! the UHID device and passes the kernel's requests and these answers on.
 //!
 //! Before a device is created, two serial reads 250 ms apart must agree, so
-//! OpenRazer never sees a device that is answering for someone else. While
+//! OpenRazer never sees a device that is answering for someone else. A
+//! device that comes back with the serial it was published with needs one:
+//! that answer can only be its own. While
 //! a wired device of the model is bound, OpenRazer has that one, and this
 //! one waits. Failures back off per route; nothing is blocked for good.
 
@@ -93,6 +95,9 @@ pub struct VirtualDevice {
     /// The last failure was the device not answering. The backoff ends
     /// as soon as the lane shows life.
     pub waiting_for_device: bool,
+    /// Our own battery query had the device when a serial read was due.
+    /// The read goes once the query is done, with no backoff.
+    pub waiting_for_probe: bool,
     /// The lane showed life while a serial read was out; its answer may
     /// predate that.
     pub life_during_read: bool,
@@ -101,6 +106,9 @@ pub struct VirtualDevice {
     pub no_serial: [u8; 32],
     /// The fingerprint both serial reads agreed on last.
     pub print: Option<[u8; 32]>,
+    /// The real serial it was last published with, kept by the lane's
+    /// device when this one goes. A first read that gives it again is enough.
+    pub known: Option<[u8; 32]>,
     /// The last failure logged, and its delay.
     pub told: Option<(String, u64)>,
     /// The wired device of the model is another unit, by its serial.
@@ -127,9 +135,11 @@ impl VirtualDevice {
             fast_until: None,
             recoveries: 0,
             waiting_for_device: false,
+            waiting_for_probe: false,
             life_during_read: false,
             no_serial,
             print: None,
+            known: None,
             told: None,
             beside: false,
         }
@@ -166,6 +176,7 @@ impl VirtualDevice {
     /// way between signs of life doesn't fill the log. True when logged.
     pub fn fail(&mut self, now: u64, why: &str) -> bool {
         self.waiting_for_device = false;
+        self.waiting_for_probe = false;
         self.failures = self.failures.saturating_add(1);
         let mut delay = backoff_ms(self.failures);
         if self.fast_until.is_some_and(|until| now < until) {
@@ -182,8 +193,19 @@ impl VirtualDevice {
         news
     }
 
+    /// Our own battery query has the device. It takes a few milliseconds,
+    /// and the loop runs again when it ends, so this is no failure: the
+    /// first read is kept, nothing is logged, and `at` is only a fallback.
+    pub fn wait_for_probe(&mut self, now: u64) {
+        if let Phase::Idle { at, .. } = &mut self.phase {
+            *at = now + backoff_ms(1);
+            self.waiting_for_probe = true;
+        }
+    }
+
     /// Something that won't fix itself quickly.
     pub fn block(&mut self, now: u64, why: &str) {
+        self.waiting_for_probe = false;
         if self.tell(why, BLOCKED_RETRY_MS) {
             eprintln!("openrazer {}: {why}; retrying in 5 minutes", self.who);
         }
@@ -276,6 +298,9 @@ impl VirtualDevice {
     pub fn published(&mut self, print: [u8; 32]) {
         (self.failures, self.fast_until, self.told) = (0, None, None);
         self.print = Some(print);
+        if print != self.no_serial {
+            self.known = Some(print);
+        }
     }
 
     /// The serial read finished. True when both reads agree.
@@ -294,6 +319,8 @@ impl VirtualDevice {
             other => other,
         };
         match (result, first) {
+            // Back after sleep or a cable: its own serial again.
+            (Ok(print), None) if self.known == Some(print) => Some(print),
             (Ok(print), None) => {
                 self.phase = Phase::Idle {
                     at: now + SERIAL_GAP_MS,
@@ -778,6 +805,47 @@ mod tests {
         v.phase = Phase::Reading { first: None };
         v.serial_read(800, Err(decode::SerialError::Invalid));
         assert!(matches!(v.phase, Phase::Blocked { until } if until == 800 + BLOCKED_RETRY_MS));
+    }
+
+    #[test]
+    fn known_serial_once() {
+        let mut v = device();
+        v.published([1; 32]);
+        assert_eq!(v.known, Some([1; 32]));
+        v.phase = Phase::Reading { first: None };
+        assert_eq!(v.serial_read(10, Ok([1; 32])), Some([1; 32]));
+        // Another unit on the lane gets both reads.
+        v.phase = Phase::Reading { first: None };
+        assert_eq!(v.serial_read(20, Ok([2; 32])), None);
+        assert!(matches!(v.phase, Phase::Idle { at: 270, .. }));
+        // A stand-in is never known.
+        let mut v = device();
+        v.published(v.no_serial);
+        assert_eq!(v.known, None);
+        v.phase = Phase::Reading { first: None };
+        assert_eq!(v.serial_read(30, Err(decode::SerialError::Unusable)), None);
+    }
+
+    #[test]
+    fn probe_wait_is_no_failure() {
+        let mut v = device();
+        v.phase = Phase::Idle {
+            at: 300,
+            first: Some([1; 32]),
+        };
+        v.wait_for_probe(300);
+        assert!(v.waiting_for_probe);
+        assert_eq!((v.failures, v.told.is_none()), (0, true));
+        assert!(matches!(
+            v.phase,
+            Phase::Idle {
+                at: 400,
+                first: Some(_)
+            }
+        ));
+        // A real failure ends the wait, so its backoff holds.
+        v.fail(310, "another client holds the device");
+        assert!(!v.waiting_for_probe);
     }
 
     fn live() -> Live {

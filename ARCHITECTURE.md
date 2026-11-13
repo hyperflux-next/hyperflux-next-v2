@@ -655,7 +655,7 @@ stops offering OpenRazer devices ("the device keeper isn't connected") and
 stops publishing batteries.
 
 Either way, after the next hello the bridge makes the batteries again at
-once. OpenRazer devices follow after two serial reads.
+once. OpenRazer devices follow after their serial reads.
 
 ## 4. Bridge behaviour other parts rely on
 
@@ -947,7 +947,13 @@ subsystem `drivers`). Each qualified, available route of a device with an
 
 - Two identical serial reads, 250 ms apart, come before UHID_CREATE2. A
   transaction id mismatch on a serial read is retryable, like any other
-  query mismatch.
+  query mismatch. A device that comes back after sleep, a cable or a
+  resume needs one read when it gives the serial it was last published
+  with. The lane's device keeps that serial while the route is gone.
+  Stand-in fingerprints don't count.
+- A serial read that finds the bridge's own battery query on the device
+  waits for it to end, with no backoff and no log line. On wake the query
+  comes first and takes a few milliseconds.
 - A wired device of the same model suppresses the virtual device. This is
   `0003:1532:<wired pid>` bound to the entry's driver
   (`/sys/bus/hid/drivers/<driver>/`), or present in `/sys/bus/hid/devices`
@@ -978,7 +984,7 @@ subsystem `drivers`). Each qualified, available route of a device with an
   when the lane shows no life for 10 s. Any life keeps the device.
 - A route that backs off because its device answered 0x04 tries again at the
   lane's next evidence, without waiting out the backoff. The 250 ms between
-  the two serial reads still holds.
+  the two serial reads still holds where two are needed.
 - No route is blocked for good. A blocked route retries every 5 minutes.
 - `UHID_STOP` (a driver hand-over) recovers up to 3 times.
 - At teardown the keeper unbinds the driver on a worker thread while the

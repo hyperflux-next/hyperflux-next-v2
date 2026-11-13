@@ -1351,7 +1351,7 @@ impl Bridge {
                 d.probe.due = Some(self.now);
             }
             let device_id = d.id();
-            let pid = d.pid;
+            let (pid, known) = (d.pid, d.known_serial);
             d.not_offered = if entry.is_none() {
                 Some("OpenRazer doesn't drive this device")
             } else if drivers.is_none() {
@@ -1373,12 +1373,14 @@ impl Bridge {
                 continue;
             }
             let v = vdev.get_or_insert_with(|| {
-                VirtualDevice::new(
+                let mut v = VirtualDevice::new(
                     format!("{rx_id}/{device_id}"),
                     entry.expect("wanted implies an entry"),
                     vdev::phys_label(&rx_id, generation, &device_id),
                     self.now,
-                )
+                );
+                v.known = known;
+                v
             });
             self.step_vdev(key, lane, v);
             if let Some(d) = self.lane_device(key, lane, Some(pid)) {
@@ -1400,19 +1402,25 @@ impl Bridge {
     fn step_vdev(&mut self, key: u64, lane: Lane, v: &mut VirtualDevice) {
         let now = self.now;
         // On its cable the device doesn't answer through the receiver.
-        if matches!(v.phase, Phase::Idle { at, .. } if at <= now) {
+        if matches!(v.phase, Phase::Idle { at, .. } if at <= now || v.waiting_for_probe) {
             v.cable(now, self.wired(v).as_deref());
         }
         match &mut v.phase {
-            Phase::Idle { at, first } if *at <= now => {
+            Phase::Idle { at, first } if *at <= now || v.waiting_for_probe => {
                 let first = *first;
                 let request = v.serial_request();
-                if !self.leases.take_internal(key, lane, &Holder::OpenRazer) {
+                let holder = self.leases.on_device(key, lane).map(|l| &l.holder);
+                if holder == Some(&Holder::HyperFlux) {
+                    // On wake the battery query goes first. Backing off
+                    // would cost 100 ms for a 4 ms query.
+                    v.wait_for_probe(now);
+                } else if !self.leases.take_internal(key, lane, &Holder::OpenRazer) {
                     v.fail(now, "another client holds the device");
                 } else if self
                     .submit(key, lane, request, OWN_TIMEOUT_MS, 0, Origin::Serial)
                     .is_ok()
                 {
+                    v.waiting_for_probe = false;
                     v.phase = Phase::Reading { first };
                 } else {
                     self.release_internal(key, lane, &Holder::OpenRazer);
@@ -1476,6 +1484,7 @@ impl Bridge {
             }
         }
         if let Some(d) = self.lane_device(p.rx, p.lane, Some(p.pid)) {
+            d.known_serial = v.known;
             d.vdev = Some(v);
         }
     }
