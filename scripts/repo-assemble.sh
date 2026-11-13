@@ -95,8 +95,17 @@ echo "$releases" >"$site/releases"
 
 project_url=$(sed -n 's/^PROJECT_URL ?= //p' Makefile)
 python3 -I scripts/site-page.py "$version" "$site_url" "$project_url" >"$site/index.html"
+# A project site can't have a robots.txt of its own (that belongs to the
+# host's root), so search engines get the page from a sitemap submitted
+# by hand. The page changes with every release.
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' \
+    "<url><loc>$site_url/</loc><lastmod>$(date -u +%F)</lastmod></url>" '</urlset>' >"$site/sitemap.xml"
 # The page's font, with its licence.
 install -D -m 0644 -t "$site/fonts" packaging/site/fonts/martian-mono.woff2 packaging/site/fonts/OFL.txt
+# The icons and the link preview, rendered by scripts/site-images.sh.
+install -m 0644 -t "$site" packaging/site/icon.svg packaging/site/favicon.ico \
+    packaging/site/apple-touch-icon.png packaging/site/preview.png
 install -m 0644 packaging/install.sh "$site/install.sh"
 touch "$site/.nojekyll"
 echo "Unsigned site for $version is in $site"
