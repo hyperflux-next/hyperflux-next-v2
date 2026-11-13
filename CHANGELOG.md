@@ -2,6 +2,38 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.6
+
+On Fedora and openSUSE, Doctor reports HFX-401 after the update until the
+next boot, which installs the rebuilt driver. The devices keep working
+meanwhile.
+
+### Added
+
+- Doctor's HFX-401 names the kernel the driver was built for, and what to
+  do about it.
+- The package site has an icon, a sitemap and link previews.
+
+### Changed
+
+- A keyboard or mouse waking from sleep reaches OpenRazer apps sooner
+  (0.36 s down to under 20 ms on the TKL).
+- The openSUSE guide asks Tumbleweed users to run `zypper dup` before
+  installing.
+
+### Fixed
+
+- The bridge logged "another client holds the device" for its own battery
+  query.
+- The package site's text jumped when its font arrived on phones.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.5
 
 Reboot after updating. This release changes the OpenRazer driver, and the

@@ -236,8 +236,14 @@ def test_site_page():
     # Every link into the repository names a file it has.
     for path in re.findall(rf'{re.escape(project)}/blob/main/([^"#]+)', page):
         assert (ROOT / path).is_file(), path
-    for font in re.findall(r'url\("(fonts/[^"]+)"\)', page):
-        assert (ROOT / "packaging/site" / font).is_file(), font
+    # Every file the page loads is in packaging/site and on the site.
+    assemble = read("scripts/repo-assemble.sh")
+    files = re.findall(r'url\("(fonts/[^"]+)"\)', page)
+    files += re.findall(rf'(?:href|content)="(?:{re.escape(site)}/)?([\w/.-]+\.(?:woff2|ico|svg|png))"', page)
+    assert {"icon.svg", "favicon.ico", "apple-touch-icon.png", "preview.png"} <= set(files)
+    for name in files:
+        assert (ROOT / "packaging/site" / name).is_file(), name
+        assert f"packaging/site/{name}" in assemble, name
     assert (ROOT / "packaging/site/fonts/OFL.txt").is_file()
     assert "github.io" not in page.replace(site, "")
 

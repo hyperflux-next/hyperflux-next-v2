@@ -87,6 +87,12 @@ Full builds OpenRazer's kernel drivers with DKMS, which needs your
 kernel's headers: `kernel-devel` on Fedora, `kernel-default-devel` on
 openSUSE. Core needs none.
 
+On Tumbleweed, bring the system up to date first with `sudo zypper dup`,
+and reboot if that brought a new kernel. Its repository carries headers
+for the newest kernel and no other. On a system that is behind, DKMS
+builds the driver for a kernel you aren't running, and Doctor reports
+[HFX-401](troubleshooting.md#hfx-401).
+
 ```sh
 sudo dnf install hyperflux-next-v2-full kernel-devel                # Fedora
 sudo zypper install hyperflux-next-v2-full kernel-default-devel     # openSUSE

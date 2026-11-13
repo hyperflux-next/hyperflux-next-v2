@@ -130,6 +130,9 @@ pub struct Module {
     pub capability_loaded: Option<bool>,
     /// Installed, not loaded, and Secure Boot won't load it as signed.
     pub secure_boot_blocked: bool,
+    /// Not installed for the running kernel: the other kernels it is built
+    /// for, and whether each can boot.
+    pub elsewhere: Vec<(String, bool)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -733,15 +736,48 @@ fn module(system: &System, name: &'static str) -> Module {
         .then(|| identity(system.read(&format!("{dir}/srcversion"))));
     let tag = system.run(&format!("modinfo -F {CAPABILITY_NAME} {name}"));
     let parameter = system.read(&format!("{dir}/parameters/{CAPABILITY_NAME}"));
+    let installed = identity(system.run(&format!("modinfo -F srcversion {name}")));
     Module {
         name,
-        installed: identity(system.run(&format!("modinfo -F srcversion {name}"))),
+        elsewhere: if installed.is_none() {
+            built_elsewhere(system, name)
+        } else {
+            Vec::new()
+        },
+        installed,
         capability: patched.then(|| tag.as_deref() == Some(CAPABILITY_VALUE)),
         capability_loaded: (patched && loaded.is_some())
             .then(|| parameter.as_deref() == Some(CAPABILITY_VALUE)),
         loaded,
         secure_boot_blocked: false,
     }
+}
+
+/// Kernels other than the running one that `module` is built for, and
+/// whether each can boot. DKMS builds for every kernel it has headers for,
+/// and on a rolling distribution that is behind on updates those can belong
+/// to a newer kernel that isn't installed yet.
+fn built_elsewhere(system: &System, module: &str) -> Vec<(String, bool)> {
+    let Some(running) = system.read("/proc/sys/kernel/osrelease") else {
+        return Vec::new();
+    };
+    let others: Vec<String> = system
+        .list("/usr/lib/modules", 64)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|k| plain(k) && *k != running)
+        .collect();
+    let bootable = installed_kernels(system);
+    let mut found: Vec<(String, bool)> = module_files(system, module, &others)
+        .into_iter()
+        .map(|(kernel, _)| {
+            let boots = bootable.contains(&kernel);
+            (kernel, boots)
+        })
+        .collect();
+    found.sort();
+    found.dedup();
+    found
 }
 
 /// OpenRazer's EVENT_FILE_REGEX values are simple: `.*`, a literal stem,
@@ -1467,7 +1503,7 @@ fn lamparray_finding(facts: &Facts) -> Option<Finding> {
     (!why.is_empty()).then_some(finding)
 }
 
-fn blocking_module(modules: &[Module]) -> Option<(ErrorCode, &'static str, &'static str)> {
+fn blocking_module(modules: &[Module]) -> Option<(ErrorCode, &Module, &'static str)> {
     use ErrorCode::{
         OpenRazerDriverNotActive as NotActive, OpenRazerDriverNotPatched as NotPatched,
     };
@@ -1475,22 +1511,89 @@ fn blocking_module(modules: &[Module]) -> Option<(ErrorCode, &'static str, &'sta
         m.loaded.as_ref().is_some_and(|id| *id != m.installed) || m.capability_loaded == Some(false)
     };
     if let Some(m) = modules.iter().find(|m| m.installed.is_none()) {
-        return Some((NotActive, m.name, "not installed"));
+        let state = if m.elsewhere.iter().any(|(_, boots)| *boots) {
+            "built for another kernel"
+        } else if m.elsewhere.is_empty() {
+            "not installed"
+        } else {
+            "kernel not installed"
+        };
+        return Some((NotActive, m, state));
     }
     if let Some(m) = modules.iter().find(|m| m.secure_boot_blocked) {
-        return Some((
-            ErrorCode::SecureBootBlocked,
-            m.name,
-            "unsigned for Secure Boot",
-        ));
+        return Some((ErrorCode::SecureBootBlocked, m, "unsigned for Secure Boot"));
     }
     if let Some(m) = modules.iter().find(|m| m.capability == Some(false)) {
-        return Some((NotPatched, m.name, "no capability"));
+        return Some((NotPatched, m, "no capability"));
     }
     modules
         .iter()
         .find(stale)
-        .map(|m| (NotActive, m.name, "older copy loaded"))
+        .map(|m| (NotActive, m, "older copy loaded"))
+}
+
+/// "a", "a and b", "a, b and c".
+fn and_list(items: &[&str]) -> String {
+    match items {
+        [] => String::new(),
+        [one] => (*one).to_owned(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// HFX-401's cause and advice. Booting doesn't help when DKMS built the
+/// driver for a kernel that only has its headers here: Tumbleweed's
+/// repository carries the newest headers only, so a system behind on
+/// updates gets the driver for a kernel it hasn't installed.
+fn driver_advice(module: &Module, state: &str) -> (String, String) {
+    let name = module.name;
+    let kernels = |boots: bool| -> Vec<&str> {
+        module
+            .elsewhere
+            .iter()
+            .filter(|(_, b)| *b == boots)
+            .map(|(k, _)| k.as_str())
+            .collect()
+    };
+    let plural = |list: &[&str]| if list.len() == 1 { "kernel" } else { "kernels" };
+    match state {
+        "built for another kernel" => {
+            let list = kernels(true);
+            (
+                format!(
+                    "{name} is built for {} {}, not for the one running now.",
+                    plural(&list),
+                    and_list(&list)
+                ),
+                format!("Reboot into {}.", list.join(" or ")),
+            )
+        }
+        "kernel not installed" => {
+            let list = kernels(false);
+            (
+                format!(
+                    "{name} is built for {} {}, whose headers are installed but not the kernel itself.",
+                    plural(&list),
+                    and_list(&list)
+                ),
+                "Update the whole system so that kernel is installed too (on openSUSE \
+                 Tumbleweed: sudo zypper dup), then reboot."
+                    .into(),
+            )
+        }
+        "older copy loaded" => (
+            format!("An older copy of {name} is still loaded."),
+            "Reboot. If Doctor still reports it, reinstall \
+             hyperflux-next-v2-openrazer-driver-dkms."
+                .into(),
+        ),
+        _ => (
+            format!("{name} isn't installed for the running kernel."),
+            "Reboot. If Doctor still reports it, reinstall \
+             hyperflux-next-v2-openrazer-driver-dkms."
+                .into(),
+        ),
+    }
 }
 
 /// HFX-404's cause and advice for each way OpenRazer can be unready.
@@ -1532,7 +1635,17 @@ fn full_findings(full: &Full) -> Vec<Finding> {
     };
     let mut findings = Vec::new();
     if let Some((code, module, state)) = blocking_module(&facts.modules) {
-        findings.push(Finding::new(code, &[("module", module), ("state", state)]));
+        let mut details = vec![("module", module.name), ("state", state)];
+        let (why, remedy) = driver_advice(module, state);
+        let kernels: Vec<&str> = module.elsewhere.iter().map(|(k, _)| k.as_str()).collect();
+        let kernels = kernels.join(",");
+        if code == ErrorCode::OpenRazerDriverNotActive {
+            details.extend([("why", why.as_str()), ("remedy", remedy.as_str())]);
+            if !kernels.is_empty() {
+                details.push(("kernels", &kernels));
+            }
+        }
+        findings.push(Finding::new(code, &details));
     }
     for link in &facts.broken_links {
         findings.push(Finding::new(ErrorCode::BrokenInputLink, &[("link", link)]));
@@ -1728,6 +1841,7 @@ mod tests {
                 capability: patched,
                 capability_loaded: patched,
                 secure_boot_blocked: false,
+                elsewhere: Vec::new(),
             }
         };
         FullFacts {
@@ -2060,20 +2174,20 @@ No action required.
         full.modules[3].capability = Some(false);
         let found = blocking_module(&full.modules).unwrap();
         assert_eq!(
-            (found.0, found.1),
+            (found.0, found.1.name),
             (ErrorCode::OpenRazerDriverNotPatched, "razermouse")
         );
         full.modules[0].secure_boot_blocked = true;
         let found = blocking_module(&full.modules).unwrap();
         assert_eq!(
-            (found.0, found.1),
+            (found.0, found.1.name),
             (ErrorCode::SecureBootBlocked, "razeraccessory")
         );
         full.modules[0].secure_boot_blocked = false;
         full.modules[3].capability = Some(true);
         let found = blocking_module(&full.modules).unwrap();
         assert_eq!(
-            (found.0, found.1),
+            (found.0, found.1.name),
             (ErrorCode::OpenRazerDriverNotActive, "razerkbd")
         );
     }

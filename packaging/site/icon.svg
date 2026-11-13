@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<!-- H and F share a stem. Every edge is on a 3-unit grid, so the
+     16 and 32 px renders land on whole pixels. -->
+<rect width="48" height="48" rx="11" fill="#040805"/>
+<rect x="0.5" y="0.5" width="47" height="47" rx="10.5" fill="none" stroke="#334934"/>
+<path fill="#7ef473" d="M9 9h6v12h6V9h18v6H27v6h9v6h-9v12h-6V27h-6v12H9z"/>
+</svg>

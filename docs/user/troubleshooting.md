@@ -464,6 +464,13 @@ missing, or the kernel still has an older copy loaded. Reboot first. If
 Doctor still reports it afterwards, reinstall
 `hyperflux-next-v2-openrazer-driver-dkms` (see [HFX-402](#hfx-402)).
 
+When Doctor names another kernel, the driver was built for it, not for the
+kernel running now. If that kernel is installed, reboot into it. If only
+its headers are, rebooting won't help: update the whole system first,
+which brings the kernel too, then reboot. On openSUSE Tumbleweed that is
+`sudo zypper dup`. It happens on a system that is behind on updates, since
+Tumbleweed's repository keeps headers for its newest kernel alone.
+
 ### HFX-402
 
 The installed OpenRazer driver is some other build, which cannot drive

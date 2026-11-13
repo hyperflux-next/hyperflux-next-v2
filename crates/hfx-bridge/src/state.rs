@@ -163,6 +163,9 @@ pub struct Device {
     pub charge_unsupported: bool,
     pub last_activity: Option<u64>,
     pub vdev: Option<VirtualDevice>,
+    /// The serial its virtual device was last published with. The route
+    /// goes while the device sleeps, and the virtual device with it.
+    pub known_serial: Option<[u8; 32]>,
     /// Why the bridge doesn't offer it to OpenRazer, if it doesn't.
     pub not_offered: Option<&'static str>,
     pub learned: crate::wire::Learned,
@@ -195,6 +198,7 @@ impl Device {
             charge_unsupported: false,
             last_activity: None,
             vdev: None,
+            known_serial: None,
             not_offered: None,
             learned: crate::wire::Learned::new(devices::first_get_delay_us(pid)),
             firmware: None,

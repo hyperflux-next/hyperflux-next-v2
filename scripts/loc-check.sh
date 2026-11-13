@@ -33,7 +33,7 @@ part() {
 
 is_code() {
     case $1 in
-    *.patch | */fixtures/* | *.md | */vendor/* | */third_party/*) return 1 ;;
+    *.patch | */fixtures/* | *.md | */vendor/* | */third_party/* | *.png | *.ico) return 1 ;;
     *.rs | *.c | *.h | *.cpp | *.hpp | *.cc | *.py | *.sh | *.mk | *.cmake | *.spec) return 0 ;;
     Makefile | */Makefile | */Kbuild | */CMakeLists.txt | */PKGBUILD | */debian/rules) return 0 ;;
     */debian/*.postinst | */debian/*.prerm | */debian/*.postrm | */completions/*) return 0 ;;

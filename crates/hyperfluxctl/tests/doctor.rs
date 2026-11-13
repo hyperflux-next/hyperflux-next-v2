@@ -670,6 +670,40 @@ fn per_user_socket_first() {
 }
 
 #[test]
+fn driver_for_another_kernel() {
+    let machine = Machine::with_full();
+    machine.runner.forget("modinfo -F srcversion razerkbd");
+    let newer = "/usr/lib/modules/7.3.3-1-default";
+    let first = |m: &Machine| m.findings()[0]["details"].clone();
+    assert_eq!(first(&machine)["state"], "not installed");
+    // Tumbleweed behind on updates: the repository's headers are for a
+    // newer kernel, and DKMS built the driver for that one.
+    machine
+        .tree
+        .file(&format!("{newer}/updates/razerkbd.ko.zst"), "");
+    let details = first(&machine);
+    assert_eq!(details["state"], "kernel not installed");
+    assert_eq!(details["kernels"], "7.3.3-1-default");
+    assert!(
+        details["remedy"]
+            .as_str()
+            .unwrap()
+            .contains("sudo zypper dup")
+    );
+    machine.tree.file(&format!("{newer}/vmlinuz"), "");
+    let details = first(&machine);
+    assert_eq!(details["state"], "built for another kernel");
+    assert_eq!(details["remedy"], "Reboot into 7.3.3-1-default.");
+    let text = machine.doctor(&[]).out;
+    assert!(
+        text.contains(
+            "Why: razerkbd is built for kernel 7.3.3-1-default, not for the one running now."
+        ),
+        "{text}"
+    );
+}
+
+#[test]
 fn openrazer_modules() {
     let machine = Machine::with_full();
     machine

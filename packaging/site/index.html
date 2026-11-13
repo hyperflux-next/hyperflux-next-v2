@@ -6,8 +6,22 @@
 <title>HyperFlux Next V2: Razer HyperFlux V2 on Linux</title>
 <meta name="description" content="Linux support for the Razer HyperFlux V2 receiver. OpenRazer, Polychromatic and OpenRGB control the keyboards and mice paired to it, and their batteries show in the desktop's battery widget. Packages for Arch Linux, Ubuntu, Debian, Fedora and openSUSE.">
 <link rel="canonical" href="@SITE_URL@/">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HyperFlux Next V2">
+<meta property="og:title" content="HyperFlux Next V2: Razer HyperFlux V2 on Linux">
+<meta property="og:description" content="OpenRazer, Polychromatic and OpenRGB control the keyboards and mice on the Razer HyperFlux V2 receiver, and their batteries show in the desktop's battery widget.">
+<meta property="og:url" content="@SITE_URL@/">
+<meta property="og:image" content="@SITE_URL@/preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="The HF icon, the words Razer HyperFlux V2 on Linux, and hyperfluxctl battery listing a mouse at 79% and a keyboard at 95%.">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="color-scheme" content="dark light">
 <meta name="google-site-verification" content="aiuTZX_CnL66VFioXml21HXCZ5fZnm-tn4G6Jz-4BVE">
+<link rel="preload" href="fonts/martian-mono.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 @font-face {
   font-family: "Martian Mono";
@@ -15,6 +29,47 @@
   font-weight: 400 700;
   font-stretch: 87.5% 112.5%;
   font-display: swap;
+}
+/* Until the font arrives a system monospace stands in, scaled to Martian
+   Mono's widths (0.65 em a character in text, 0.75 em in headings) so the
+   lines wrap the same and nothing moves when it swaps in. DejaVu Sans Mono
+   and Menlo are 0.602 em wide, Liberation, Noto and Droid 0.600, Consolas
+   0.550. */
+@font-face {
+  font-family: "DejaVu stand-in";
+  src: local("DejaVu Sans Mono"), local("Menlo"), local("Menlo-Regular");
+  font-weight: 400 700; font-stretch: 87.5%;
+  size-adjust: 107.96%; ascent-override: 92.62%; descent-override: 18.52%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "DejaVu stand-in";
+  src: local("DejaVu Sans Mono"), local("Menlo"), local("Menlo-Regular");
+  font-weight: 400 700; font-stretch: 112.5%;
+  size-adjust: 124.57%; ascent-override: 80.27%; descent-override: 16.05%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Mono stand-in";
+  src: local("Liberation Mono"), local("Noto Sans Mono"), local("Droid Sans Mono");
+  font-weight: 400 700; font-stretch: 87.5%;
+  size-adjust: 108.32%; ascent-override: 92.32%; descent-override: 18.46%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Mono stand-in";
+  src: local("Liberation Mono"), local("Noto Sans Mono"), local("Droid Sans Mono");
+  font-weight: 400 700; font-stretch: 112.5%;
+  size-adjust: 124.98%; ascent-override: 80.01%; descent-override: 16.00%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Consolas stand-in";
+  src: local("Consolas");
+  font-weight: 400 700; font-stretch: 87.5%;
+  size-adjust: 118.22%; ascent-override: 84.59%; descent-override: 16.92%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Consolas stand-in";
+  src: local("Consolas");
+  font-weight: 400 700; font-stretch: 112.5%;
+  size-adjust: 136.41%; ascent-override: 73.31%; descent-override: 14.66%; line-gap-override: 0%;
 }
 
 :root {
@@ -31,7 +86,7 @@
   --color-rule: oklch(27% 0.028 148); --color-rule-2: oklch(38% 0.045 146);
   --color-accent: oklch(87% 0.2 142); --color-accent-ink: oklch(14% 0.02 150); --color-focus: oklch(87% 0.2 142);
   --color-accent-wash: oklch(23% 0.06 145);
-  --font-display: "Martian Mono", ui-monospace, "DejaVu Sans Mono", monospace; --font-body: var(--font-display);
+  --font-display: "Martian Mono", "DejaVu stand-in", "Mono stand-in", "Consolas stand-in", ui-monospace, monospace; --font-body: var(--font-display);
   --rule-hair: 1px;
   --tracking-display: -0.02em; --display-weight: 500; --stretch-display: 112.5%; --stretch-body: 87.5%;
 }

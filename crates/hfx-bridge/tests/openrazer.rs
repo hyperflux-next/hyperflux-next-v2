@@ -353,8 +353,8 @@ fn driver_handover() {
     let again = rig.device(0x00cd);
     assert_eq!(
         rig.serial_reads(Lane::Pointer),
-        reads + 2,
-        "a fresh pair of serial reads"
+        reads + 1,
+        "one read: the serial is known"
     );
     assert_eq!(again.query(1, &battery())[0], 2);
 }
@@ -608,6 +608,66 @@ fn every_catalog_device() {
         }
         c.release_lease(&lease).unwrap();
     }
+}
+
+#[test]
+fn keyboard_back_at_once() {
+    // The receiver says the keyboard is gone, as it does when the keyboard
+    // sleeps, and the virtual device goes with the route. Back with its
+    // serial, it needs one read, after the battery query that comes first.
+    let rig = Rig::new();
+    let keyboard = rig.device(0x0296);
+    rig.h.sim.identity(0, Lane::Keyboard, 0x0296, 2);
+    assert_eq!(keyboard.recv(3000), Some(Written::Destroy));
+    let reads = rig.serial_reads(Lane::Keyboard);
+    rig.h.sim.identity(0, Lane::Keyboard, 0x0296, 0);
+    let back = Instant::now();
+    let again = rig.device(0x0296);
+    assert!(
+        back.elapsed() < Duration::from_millis(200),
+        "created {:?} after it came back",
+        back.elapsed()
+    );
+    assert_eq!(rig.serial_reads(Lane::Keyboard), reads + 1);
+    assert_eq!(again.phys(), keyboard.phys());
+}
+
+#[test]
+fn mouse_back_at_once() {
+    let rig = Rig::new();
+    let mouse = rig.device(0x00cd);
+    rig.h.sim.set_asleep(0, Lane::Pointer, true);
+    mouse.query(1, &battery());
+    assert_eq!(mouse.recv(3000), Some(Written::Destroy));
+    rig.h.sim.set_asleep(0, Lane::Pointer, false);
+    rig.h.sim.activity(0, Lane::Pointer);
+    let woke = Instant::now();
+    rig.device(0x00cd);
+    // Two reads would take 250 ms.
+    assert!(
+        woke.elapsed() < Duration::from_millis(200),
+        "created {:?} after the mouse woke",
+        woke.elapsed()
+    );
+}
+
+#[test]
+fn serial_read_after_probe() {
+    // After a system sleep the bridge asks each device for its battery,
+    // and the mouse is back while its charge query is out. Its serial read
+    // goes when that ends, with no backoff.
+    let rig = Rig::new();
+    let mouse = rig.device(0x00cd);
+    rig.h.sleep_and_wake();
+    assert_eq!(mouse.recv(3000), Some(Written::Destroy));
+    let gone = Instant::now();
+    rig.device(0x00cd);
+    // About 45 ms here. Backing off would take 100 ms on its own.
+    assert!(
+        gone.elapsed() < Duration::from_millis(100),
+        "created {:?} after it went",
+        gone.elapsed()
+    );
 }
 
 #[test]
