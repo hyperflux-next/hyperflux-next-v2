@@ -342,8 +342,8 @@ pub const CATALOG: &[CatalogEntry] = &[
         "HFX-401",
         E,
         "The OpenRazer driver from HyperFlux Next V2 isn't active yet.",
-        "{module} is missing, or an older copy of it is still loaded.",
-        "Reboot. If Doctor still reports it, reinstall hyperflux-next-v2-openrazer-driver-dkms.",
+        "{why}",
+        "{remedy}",
         "Run hyperfluxctl doctor again and check that the OpenRazer driver is ready.",
     ),
     entry(
