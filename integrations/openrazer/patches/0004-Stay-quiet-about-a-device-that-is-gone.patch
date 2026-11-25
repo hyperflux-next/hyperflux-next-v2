@@ -1,0 +1,83 @@
+Stay quiet about a device that is gone
+
+Once a USB device is unplugged, every request to it fails with ENODEV,
+and each failure printed three lines: "Device data transfer failed",
+"Invalid USB response" and "Invalid Report Length". An app drawing on a
+keyboard that had gone, which openrazer-daemon still listed, wrote about
+450 lines a second for hours, and the journal dropped everything older.
+
+razer_get_usb_response() returns -ENODEV for such a device, and nothing
+prints it. Other failures print as before.
+
+Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1)
+after 0001 to 0003.
+
+diff --git a/driver/razeraccessory_driver.c b/driver/razeraccessory_driver.c
+index 346b20a..9a9dc5d 100644
+--- a/driver/razeraccessory_driver.c
++++ b/driver/razeraccessory_driver.c
+@@ -54,7 +54,8 @@ static int razer_send_payload(struct razer_accessory_device *device, struct raze
+     err = razer_get_report(device->usb_dev, request, response);
+     mutex_unlock(&device->lock);
+     if (err) {
+-        print_erroneous_report(response, "razeraccessory", "Invalid Report Length");
++        if (err != -ENODEV)
++            print_erroneous_report(response, "razeraccessory", "Invalid Report Length");
+         return err;
+     }
+ 
+diff --git a/driver/razercommon.c b/driver/razercommon.c
+index 1f07618..09e18c8 100644
+--- a/driver/razercommon.c
++++ b/driver/razercommon.c
+@@ -44,7 +44,9 @@ int razer_send_control_msg(struct usb_device *usb_dev,void const *data, uint rep
+     usleep_range(wait_min, wait_max);
+ 
+     kfree(buf);
+-    if(len!=size)
++    // A device that is gone fails every request; saying so each time fills
++    // the log (three lines a request, hundreds a second while an app draws)
++    if(len!=size && len!=-ENODEV)
+         printk(KERN_WARNING "razer driver: Device data transfer failed.\n");
+ 
+     return ((len < 0) ? len : ((len != size) ? -EIO : 0));
+@@ -104,8 +106,11 @@ int razer_get_usb_response(struct usb_device *usb_dev, uint report_index, struct
+     memcpy(response_report, buf, sizeof(struct razer_report));
+     kfree(buf);
+ 
+-    // Error if report is wrong length
+-    if(len != 90) {
++    // Error if report is wrong length. A device that is gone gets no line:
++    // the callers pass -ENODEV on and don't print either.
++    if(len == -ENODEV) {
++        result = -ENODEV;
++    } else if(len != 90) {
+         printk(KERN_WARNING "razer driver: Invalid USB response. USB Report length: %d\n", len);
+         result = 1;
+     }
+diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
+index 3c58010..961b432 100644
+--- a/driver/razerkbd_driver.c
++++ b/driver/razerkbd_driver.c
+@@ -467,7 +467,7 @@ static int __razer_send_payload(struct razer_kbd_device *device, struct razer_re
+     if (err) {
+         // For a HyperFlux device the errno already says whether the report
+         // went out, and the response is the bridge's note, not a report
+-        if (device->usb_dev)
++        if (device->usb_dev && err != -ENODEV)
+             print_erroneous_report(response, "razerkbd", "Invalid Report Length");
+         return err;
+     }
+diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
+index 1b96537..6c23779 100644
+--- a/driver/razermouse_driver.c
++++ b/driver/razermouse_driver.c
+@@ -139,7 +139,7 @@ static int __razer_send_payload(struct razer_mouse_device *device, struct razer_
+     if (err) {
+         // For a HyperFlux device the errno already says whether the report
+         // went out, and the response is the bridge's note, not a report
+-        if (device->usb_dev)
++        if (device->usb_dev && err != -ENODEV)
+             print_erroneous_report(response, "razermouse", "Invalid Report Length");
+         return err;
+     }
