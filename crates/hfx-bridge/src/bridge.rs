@@ -76,6 +76,7 @@ pub(crate) struct OpenRazer {
     pub env: OpenRazerEnv,
     pub uhid_ok: bool,
     pub capable: BTreeMap<&'static str, bool>,
+    pub prints: crate::sysfs::Prints,
 }
 
 pub(crate) struct BenchRun {
@@ -260,6 +261,7 @@ impl Bridge {
                 env,
                 uhid_ok: false,
                 capable: BTreeMap::new(),
+                prints: crate::sysfs::Prints::new(),
             }
         });
         let mut bridge = Self {
@@ -1393,10 +1395,10 @@ impl Bridge {
 
     /// The wired device of `v`'s model, if one is there, with the serials
     /// that could be read.
-    fn wired(&self, v: &VirtualDevice) -> Option<Vec<[u8; 32]>> {
-        let o = self.openrazer.as_ref()?;
+    fn wired(&mut self, v: &VirtualDevice) -> Option<Vec<[u8; 32]>> {
+        let o = self.openrazer.as_mut()?;
         let pid = v.entry.wired_product_id;
-        crate::sysfs::wired_twin(&o.env.hid_drivers, v.driver(), pid).ok()?
+        crate::sysfs::wired_twin(&o.env.hid_drivers, v.driver(), pid, &mut o.prints).ok()?
     }
 
     fn step_vdev(&mut self, key: u64, lane: Lane, v: &mut VirtualDevice) {

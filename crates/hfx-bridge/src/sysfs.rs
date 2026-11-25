@@ -4,9 +4,10 @@
 //! driver has bound for one of our phys labels, and whether a wired Razer
 //! device the same driver handles over USB is there.
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const BUS_USB: u16 = 0x0003;
 
@@ -91,12 +92,24 @@ fn serial_hash(bytes: &[u8]) -> Option<[u8; 32]> {
     hfx_proto::ids::decode_lower_hex(text)?.try_into().ok()
 }
 
-/// Whether a wired (USB) device with product id `wired_pid` is there: bound
-/// to `driver`, or not bound to any driver yet, since the kernel announces
-/// a device before its driver binds it and OpenRazer's daemon starts on it
-/// soon after. If so, the serial fingerprints that could be read from the
-/// patched drivers' `serial_sha256`. OpenRazer puts the attributes on a
-/// single interface, and an unbound device has none yet. We skip a missing
+/// Fingerprints read from `serial_sha256`, by the bound device's directory.
+/// A device gets a new name each time it's plugged in, so a fingerprint
+/// never goes stale, and each device's file is read once. The bridge looks
+/// for wired devices whenever a HID device comes or goes, unplugging
+/// included, and a read while the device is being removed holds up the
+/// removal: on 2026-11-23 one such read died in the kernel, and the USB
+/// hub stayed stuck until the reference was released by hand.
+pub type Prints = HashMap<PathBuf, [u8; 32]>;
+
+/// Whether a wired (USB) device with product id `wired_pid` is there: its
+/// control interface bound to `driver`, or a part of it not bound to any
+/// driver yet, since the kernel announces a device before its driver binds
+/// it and OpenRazer's daemon starts on it soon after. If so, the serial
+/// fingerprints that could be read from the patched drivers'
+/// `serial_sha256`. OpenRazer drives a device through one interface, the
+/// one with `device_type`, and the others only carry keys or pointer
+/// movement. Those don't count alone: they are what's left of a device the
+/// kernel didn't finish removing, which no app can use. We skip a missing
 /// or unreadable hash. A hash compares equal to the bridge's own
 /// fingerprint of the serial read through the receiver.
 ///
@@ -106,23 +119,33 @@ pub fn wired_twin(
     hid_drivers: &Path,
     driver: &str,
     wired_pid: u16,
+    prints: &mut Prints,
 ) -> io::Result<Option<Vec<[u8; 32]>>> {
     let vendor = hfx_proto::devices::RECEIVER.vendor_id;
     let wired = |(_, ids): &(String, HidIds)| *ids == (BUS_USB, vendor, wired_pid);
     let dir = hid_drivers.join(driver);
-    let bound: Vec<String> = entries(&dir)?
+    let control: Vec<PathBuf> = entries(&dir)?
         .into_iter()
         .filter(wired)
-        .map(|(n, _)| n)
+        .map(|(n, _)| dir.join(n))
+        .filter(|path| path.join("device_type").exists())
         .collect();
+    prints.retain(|path, _| path.exists());
     let all = hid_drivers.with_file_name("devices");
     let mut unbound = entries(&all).unwrap_or_default().into_iter().filter(wired);
-    if bound.is_empty() && !unbound.any(|(name, _)| !all.join(name).join("driver").exists()) {
+    if control.is_empty() && !unbound.any(|(name, _)| !all.join(name).join("driver").exists()) {
         return Ok(None);
     }
-    let hash = |name: &String| read_small(&dir.join(name).join("serial_sha256")).ok();
-    let prints = bound.iter().filter_map(hash);
-    Ok(Some(prints.filter_map(|s| serial_hash(&s)).collect()))
+    let mut found = Vec::new();
+    for path in control {
+        let print = prints.get(&path).copied().or_else(|| {
+            let print = serial_hash(&read_small(&path.join("serial_sha256")).ok()?)?;
+            prints.insert(path, print);
+            Some(print)
+        });
+        found.extend(print);
+    }
+    Ok(Some(found))
 }
 
 #[cfg(test)]
@@ -207,25 +230,20 @@ mod tests {
     fn wired_twins() {
         let root = tempfile::tempdir().unwrap();
         let (drivers, all) = (root.path().join("drivers"), root.path().join("devices"));
-        let twin = |pid| wired_twin(&drivers, "razermouse", pid).unwrap();
+        let mut prints = Prints::new();
+        let mut twin = |pid| wired_twin(&drivers, "razermouse", pid, &mut prints).unwrap();
         // Announced, and no driver has it yet.
         std::fs::create_dir_all(all.join("0003:1532:00CC.0007")).unwrap();
         std::fs::create_dir_all(all.join("0003:1532:00AA.0008/driver")).unwrap();
         assert_eq!((twin(0x00cc), twin(0x00aa)), (Some(Vec::new()), None));
         std::fs::create_dir(all.join("0003:1532:00CC.0007/driver")).unwrap();
         assert_eq!(twin(0x00cc), None);
-        // Bound, with the hash on a single interface, and it equals the
+        // Bound, with the hash on the control interface, and it equals the
         // fingerprint the bridge makes from the serial read through the receiver.
         let control = drivers.join("razermouse/0003:1532:00CC.0007");
         std::fs::create_dir_all(&control).unwrap();
         std::fs::create_dir_all(drivers.join("razermouse/0003:1532:00CC.0006")).unwrap();
-        std::fs::write(
-            control.join("serial_sha256"),
-            serial_attr(b"PM2342H100000001"),
-        )
-        .unwrap();
-        let print = decode::fingerprint(b"PM2342H100000001").unwrap();
-        assert_eq!(twin(0x00cc), Some(vec![print]));
+        std::fs::write(control.join("device_type"), "Razer Basilisk V3 Pro 35K\n").unwrap();
         // A hash that isn't 32 bytes of lowercase hex is no hash.
         std::fs::write(control.join("serial_sha256"), "not a hash\n").unwrap();
         assert_eq!(twin(0x00cc), Some(Vec::new()));
@@ -233,6 +251,67 @@ mod tests {
         std::fs::remove_file(control.join("serial_sha256")).unwrap();
         std::fs::create_dir(control.join("serial_sha256")).unwrap();
         assert_eq!(twin(0x00cc), Some(Vec::new()));
-        assert_eq!(wired_twin(&drivers, "razerkbd", 0x0298).unwrap(), None);
+        std::fs::remove_dir(control.join("serial_sha256")).unwrap();
+        std::fs::write(
+            control.join("serial_sha256"),
+            serial_attr(b"PM2342H100000001"),
+        )
+        .unwrap();
+        let print = decode::fingerprint(b"PM2342H100000001").unwrap();
+        assert_eq!(twin(0x00cc), Some(vec![print]));
+        // Read once: later calls don't open the file again.
+        std::fs::remove_file(control.join("serial_sha256")).unwrap();
+        assert_eq!(twin(0x00cc), Some(vec![print]));
+        assert_eq!(
+            wired_twin(&drivers, "razerkbd", 0x0298, &mut Prints::new()).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn half_removed_device() {
+        let root = tempfile::tempdir().unwrap();
+        let (drivers, all) = (root.path().join("drivers"), root.path().join("devices"));
+        let mut prints = Prints::new();
+        // The control interface went, the two key interfaces stayed bound.
+        for name in ["0003:1532:0298.0053", "0003:1532:0298.0054"] {
+            std::fs::create_dir_all(drivers.join("razerkbd").join(name)).unwrap();
+            std::fs::create_dir_all(all.join(name).join("driver")).unwrap();
+        }
+        assert_eq!(
+            wired_twin(&drivers, "razerkbd", 0x0298, &mut prints).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn prints_follow_devices() {
+        let root = tempfile::tempdir().unwrap();
+        let (drivers, all) = (root.path().join("drivers"), root.path().join("devices"));
+        let mut prints = Prints::new();
+        let name = "0003:1532:0298.0052";
+        let control = drivers.join("razerkbd").join(name);
+        std::fs::create_dir_all(&control).unwrap();
+        std::fs::create_dir_all(all.join(name).join("driver")).unwrap();
+        std::fs::write(
+            control.join("device_type"),
+            "Razer DeathStalker V2 Pro TKL\n",
+        )
+        .unwrap();
+        std::fs::write(
+            control.join("serial_sha256"),
+            serial_attr(b"PM2329F67300033"),
+        )
+        .unwrap();
+        wired_twin(&drivers, "razerkbd", 0x0298, &mut prints).unwrap();
+        assert_eq!(prints.len(), 1);
+        // Unplugged: the next look forgets it.
+        std::fs::remove_dir_all(&control).unwrap();
+        std::fs::remove_dir_all(all.join(name)).unwrap();
+        assert_eq!(
+            wired_twin(&drivers, "razerkbd", 0x0298, &mut prints).unwrap(),
+            None
+        );
+        assert!(prints.is_empty());
     }
 }

@@ -879,17 +879,18 @@ fn openrazer_devices(
 }
 
 /// The bridge's OpenRazer devices that are there for OpenRazer to list.
-/// From a bridge that does not say, the online devices with a route: it
-/// makes one once it reads the same serial twice, which needs the device
-/// to answer.
+/// One the bridge leaves to its cable is listed under its wired product id,
+/// and missing there means no app can light it. From a bridge that does not
+/// say, the online devices with a route: it makes one once it reads the
+/// same serial twice, which needs the device to answer.
 fn expected_published(snapshot: &Snapshot) -> Vec<(u16, u16)> {
-    let live = |d: &DeviceInfo| match &d.openrazer {
-        Some(o) => o.state == OpenRazerState::Live,
-        None => d.controllable && d.presence == Presence::Online,
+    let listed = |d: &DeviceInfo, catalog: &devices::Device| match &d.openrazer {
+        Some(o) if o.state == OpenRazerState::Cable => Some(catalog.wired_product_id),
+        Some(o) => (o.state == OpenRazerState::Live).then_some(d.product_id),
+        None => (d.controllable && d.presence == Presence::Online).then_some(d.product_id),
     };
     openrazer_devices(snapshot)
-        .filter(|(d, _)| live(d))
-        .map(|(d, _)| (d.vendor_id, d.product_id))
+        .filter_map(|(d, catalog)| Some((d.vendor_id, listed(d, catalog)?)))
         .collect()
 }
 
@@ -1612,7 +1613,8 @@ fn openrazer_advice(state: &str, missing: &str) -> (String, String) {
         // the daemon restarts.
         "devices missing" => (
             format!(
-                "openrazer-daemon runs but hasn't listed {missing}, which the bridge offers it."
+                "openrazer-daemon runs but hasn't listed {missing}, which the bridge \
+                 offers it or leaves to it on a cable."
             ),
             "Restart it: systemctl --user restart openrazer-daemon.service".into(),
         ),
@@ -2125,7 +2127,7 @@ No action required.
         let mouse = cabled.receivers[0].devices[0].openrazer.as_mut();
         mouse.unwrap().state = OpenRazerState::Cable;
         assert_eq!(waiting_for(&cabled, &[]).len(), 1);
-        assert!(expected_published(&cabled).is_empty());
+        assert_eq!(expected_published(&cabled), [(0x1532, 0x00cc)]);
     }
 
     #[test]

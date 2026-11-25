@@ -503,7 +503,7 @@ which of these it found:
 - your user is not in the OpenRazer group yet
 - `openrazer-daemon` is not running
 - the daemon runs but has not listed every device the bridge created for
-  it
+  it, or a device on its cable, which it should have as the wired device
 - Doctor couldn't ask your session bus at all (over SSH, for example)
 
 A device that is asleep or out of range is not part of this check.
