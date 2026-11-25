@@ -7,6 +7,10 @@ Each section is also the release's notes on GitHub.
 Reboot after updating. This release changes the OpenRazer driver, and the
 old one stays loaded until you do. Meanwhile Doctor reports HFX-401.
 
+Fedora and openSUSE get openrazer-daemon 3.12.5 from OpenRazer now. It's
+the 3.12.4 daemon with a new version number, and it works with this
+release's driver.
+
 ### Fixed
 
 - Unplugging a wired keyboard or mouse could leave it half removed until
