@@ -33,7 +33,9 @@
 When the distributions' `openrazer-daemon` moves to a new OpenRazer
 release, the weekly workflow fails its install tests. Update the OpenRazer
 pin and the patch, and the versions the driver package provides, then
-release a new version.
+release a new version. A release whose daemon differs in nothing but its
+version string (3.12.5 was one) can go on the `daemons` list in
+`scripts/install-test.sh` instead, while the distributions disagree.
 
 `packaging/releases` lists the distribution releases the site serves.
 Every week, `scripts/releases.py check` asks the distributions what is
