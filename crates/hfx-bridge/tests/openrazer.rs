@@ -15,7 +15,7 @@ use hfx_proto::messages::{
 use hfx_proto::openrazer::{DESCRIPTOR, Uncertainty, envelope, parse_envelope};
 use hfx_proto::report::{self, Report};
 use std::os::unix::net::UnixDatagram;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 /// The kernel end of one virtual device.
@@ -140,6 +140,14 @@ impl Rig {
             .filter(|r| r[6] == 0x00 && r[7] == 0x82)
             .count()
     }
+}
+
+/// A wired device's control interface, bound to its driver: the one
+/// OpenRazer drives, which has `device_type`.
+fn wired_control(dir: &Path) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(dir.join("device_type"), "Razer\n").unwrap();
+    dir.to_path_buf()
 }
 
 /// A `serial_sha256` attribute value, as the patched driver writes it: the
@@ -363,16 +371,19 @@ fn driver_handover() {
 fn second_unit_on_the_cable() {
     let rig = Rig::new();
     let mouse = rig.device(0x00cd);
-    let twin = rig.drivers().join("razermouse/0003:1532:00CC.0009");
-    std::fs::create_dir_all(&twin).unwrap();
     // OpenRazer binds the mouse's other interfaces too, without a serial.
     let other = rig.drivers().join("razermouse/0003:1532:00CC.0008");
     std::fs::create_dir_all(&other).unwrap();
     // Same model, and a hash that can be read and differs: another unit.
+    let twin = wired_control(&rig.drivers().join("razermouse/0003:1532:00CC.0009"));
     std::fs::write(twin.join("serial_sha256"), serial_hash(b"PM2342H199999999")).unwrap();
     rig.uevent("bind");
     assert_eq!(mouse.recv(300), None);
-    // The paired one on its cable, by its serial.
+    // That one is unplugged and the paired one goes on the cable, known by
+    // its serial.
+    std::fs::remove_dir_all(&twin).unwrap();
+    rig.uevent("remove");
+    let twin = wired_control(&rig.drivers().join("razermouse/0003:1532:00CC.000A"));
     std::fs::write(twin.join("serial_sha256"), serial_hash(b"PM2342H100000001")).unwrap();
     rig.uevent("bind");
     assert_eq!(mouse.recv(3000), Some(Written::Destroy));
@@ -401,7 +412,7 @@ fn cable_before_its_driver_binds() {
     // slot says: it stays away, and nothing asks for its serial.
     let reads = rig.serial_reads(Lane::Pointer);
     std::fs::create_dir(rig.or.sys.path().join(ANNOUNCED).join("driver")).unwrap();
-    std::fs::create_dir_all(rig.drivers().join("razermouse/0003:1532:00AA.0011")).unwrap();
+    wired_control(&rig.drivers().join("razermouse/0003:1532:00AA.0011"));
     rig.uevent("bind");
     rig.h.sim.activity(0, Lane::Pointer);
     std::thread::sleep(Duration::from_secs(1));
@@ -419,8 +430,7 @@ fn cable_before_its_driver_binds() {
 fn cable_in_at_start() {
     let rig = Rig::with(Options {
         sysfs: Some(|sys: &Path| {
-            let wired = sys.join("drivers/razerkbd/0003:1532:0292.0021");
-            std::fs::create_dir_all(&wired).unwrap();
+            let wired = wired_control(&sys.join("drivers/razerkbd/0003:1532:0292.0021"));
             // A second unit's hash, so the receiver copy would stay once the
             // keyboard's own serial is known. Before that, with no serial
             // read yet, the cable still hides it.
@@ -454,13 +464,27 @@ fn checked_keyboard_on_cable() {
     common::until(&mut c, 5, |s| common::level(s, 0, Lane::Keyboard).is_some());
     // On its cable it charges, and the bridge has to ask to find out.
     rig.h.sim.status(0, Lane::Keyboard, 202, 1, 1);
-    let twin = rig.drivers().join("razerkbd/0003:1532:0292.0009");
-    std::fs::create_dir_all(&twin).unwrap();
+    let twin = wired_control(&rig.drivers().join("razerkbd/0003:1532:0292.0009"));
     std::fs::write(twin.join("serial_sha256"), serial_hash(b"IO2318K200000001")).unwrap();
     rig.uevent("bind");
     assert_eq!(keyboard.recv(3000), Some(Written::Destroy));
     let charge = |s: &Snapshot| common::device(s, 0, Lane::Keyboard)?.battery.charge;
     common::until(&mut c, 5, |s| charge(s) == Some(Charge::Charging));
+}
+
+#[test]
+fn half_removed_cable_is_no_cable() {
+    let rig = Rig::with(Options::before(|sim| {
+        sim.identity(0, Lane::Keyboard, 0x0290, 1)
+    }));
+    let keyboard = rig.device(0x0290);
+    // A removal that never finished: the key interfaces stay bound, the
+    // control interface is gone, and nothing can drive the keyboard there.
+    for name in ["0003:1532:0292.0053", "0003:1532:0292.0054"] {
+        std::fs::create_dir_all(rig.drivers().join("razerkbd").join(name)).unwrap();
+    }
+    rig.uevent("remove");
+    assert_eq!(keyboard.recv(1000), None);
 }
 
 #[test]
