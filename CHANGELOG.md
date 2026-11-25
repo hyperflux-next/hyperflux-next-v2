@@ -2,6 +2,28 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.7
+
+Reboot after updating. This release changes the OpenRazer driver, and the
+old one stays loaded until you do. Meanwhile Doctor reports HFX-401.
+
+### Fixed
+
+- Unplugging a wired keyboard or mouse could leave it half removed until
+  a reboot.
+- A half-removed wired device kept the same device on the receiver away
+  from OpenRazer apps.
+- razerkbd and razermouse logged every request to a device that was
+  already gone.
+- Doctor said ready when OpenRazer was missing a device on its cable.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.6
 
 On Fedora and openSUSE, Doctor reports HFX-401 after the update until the
