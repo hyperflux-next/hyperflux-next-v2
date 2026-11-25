@@ -18,6 +18,9 @@ set -euo pipefail
 target=${1%%-*} release=${1#"${1%%-*}"} version=$2 pkgs=/dist/$1
 release=${release#-}
 openrazer=3.12.4
+# Daemon releases checked against this driver. 3.12.5 changed the daemon's
+# version string and nothing else, and Fedora and openSUSE ship it.
+daemons=("$openrazer" 3.12.5)
 group=plugdev
 stock=(openrazer-daemon python3-openrazer)
 units=/usr/lib/systemd/system rules=/usr/lib/udev/rules.d
@@ -320,11 +323,14 @@ no_enabled_units
 for name in openrazer-driver-dkms openrazer-kernel-modules-dkms; do
     if installed "$name"; then fail "the distribution's $name was installed next to Full"; fi
 done
-daemon=$(daemon_version)
-case $daemon in
-"$openrazer"[-+~]* | "$openrazer") ;;
-*) fail "openrazer-daemon is $daemon, but the packaged driver is $openrazer: rebuild against it" ;;
-esac
+daemon=$(daemon_version) checked=
+for known in "${daemons[@]}"; do
+    case $daemon in
+    "$known"[-+~]* | "$known") checked=$known ;;
+    esac
+done
+[ -n "$checked" ] ||
+    fail "openrazer-daemon is $daemon, but the packaged driver is $openrazer: rebuild against it"
 getent group "$group" >/dev/null || fail "no $group group"
 grep -qF "\"version\":\"$version\"" "$full_json" || fail "full.json names another version"
 for file in 69-hyperflux-next-openrazer-access.rules 70-hyperflux-next-openrazer-keys.rules 99-razer.rules; do
