@@ -137,14 +137,28 @@ install_dnf() {
 
 # Silverblue, Kinoite, Bazzite. rpm-ostree reads the key from a file, and
 # --apply-live makes Core usable now, so its units can be enabled; the next
-# boot keeps it.
+# boot keeps it. rpm-ostree does one thing at a time, so an update the system
+# is making (Zincati, Bazzite's updater) is waited for. One that waits for a
+# reboot can't be applied live: Core goes onto it, and the units come after.
 install_rpm_ostree() {
     say "Adding the key and the repository"
     as_root install -m 0644 "$tmp/key.asc" /etc/pki/rpm-gpg/RPM-GPG-KEY-hyperflux-next
     fetch "$SITE/fedora/hyperflux-next.repo" "$tmp/repo"
     sed 's|^gpgkey=.*|gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-hyperflux-next|' "$tmp/repo" >"$tmp/repo.file"
     as_root install -m 0644 "$tmp/repo.file" /etc/yum.repos.d/hyperflux-next.repo
+    n=0
+    while rpm-ostree status 2>/dev/null | grep -q '^State: busy'; do
+        [ "$n" -gt 0 ] || say "Waiting for the system update that is running"
+        n=$((n + 1))
+        [ "$n" -le 180 ] || die "the system update is still running after 30 minutes. Run install.sh again once it has finished."
+        sleep 10
+    done
     say "Layering hyperflux-next-v2-linux"
+    if [ "$(rpm-ostree status --pending-exit-77 >/dev/null 2>&1; echo $?)" = 77 ]; then
+        pm rpm-ostree install --idempotent hyperflux-next-v2-linux
+        echo "An update waits for a reboot, and Core is layered onto it. Reboot, then run install.sh again to enable the bridge."
+        exit 0
+    fi
     pm rpm-ostree install --idempotent --apply-live hyperflux-next-v2-linux
 }
 
