@@ -76,11 +76,11 @@ impl Kind {
 pub enum Tier {
     /// Verified on real hardware through the receiver.
     Tested,
-    /// Razer lists it for the receiver, OpenRazer 3.12.4 or OpenRGB 1.1
+    /// Razer lists it for the receiver, OpenRazer 3.12.5 or OpenRGB 1.1
     /// drives it, and the entry matches theirs. Not tried through the
     /// receiver.
     Checked,
-    /// Razer lists it, but neither OpenRazer 3.12.4 nor OpenRGB 1.1 can
+    /// Razer lists it, but neither OpenRazer 3.12.5 nor OpenRGB 1.1 can
     /// drive it.
     Listed,
 }

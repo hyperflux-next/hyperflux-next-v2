@@ -11,7 +11,7 @@
 pkgbase=hyperflux-next-v2
 pkgname=(hyperflux-next-v2-linux hyperflux-next-v2-openrazer-driver-dkms hyperflux-next-v2-full
          hyperflux-next-v2-openrgb-plugin)
-pkgver=1.0.7
+pkgver=1.0.8
 pkgrel=1
 arch=('x86_64')
 url='https://github.com/hyperflux-next/hyperflux-next-v2'
@@ -19,8 +19,8 @@ license=('GPL-2.0-only')
 makedepends=('cargo' 'cmake' 'patch' 'python' 'qt6-base')
 checkdepends=('python-pytest')
 options=('!lto' '!debug')
-_openrazer_version=3.12.4
-_openrazer_commit=1ef8a91712906a89fd332a2ed62bbd105315d6d1
+_openrazer_version=3.12.5
+_openrazer_commit=f7626d0003e03a43f7ea8b449140c81426dc3eb2
 _openrgb_commit=8e16de27858cf2be6af54a33ce003df74cb9fd3e
 _srcdir=hyperflux-next-v2-$pkgver
 source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
@@ -28,7 +28,7 @@ source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
         "openrgb-$_openrgb_commit.tar.gz::https://github.com/CalcProgrammer1/OpenRGB/archive/$_openrgb_commit.tar.gz")
 noextract=("openrazer-$_openrazer_commit.tar.gz" "openrgb-$_openrgb_commit.tar.gz")
 sha256sums=('SKIP'
-            'ffda843601ad4bfaf35a555dbe0c40d9dfbc6fe8df74033f3c2ab2216d14278b'
+            'c4d883b9e927dfee92bddf772e5b2a0c30a58e7eebf944ebcd3d514eb63575d2'
             '92839b6703e2ff1355adb374dfc92666489fcbe3ac2ed721fa6f0ef1e44845c1')
 
 # Arch packages OpenRazer with the openrazer group. The CLI is built with

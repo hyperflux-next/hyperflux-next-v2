@@ -25,7 +25,7 @@ tag and as a read-only parameter.
 match a virtual device. The group stays plugdev; packaging substitutes
 it.
 
-Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1).
+Applies to OpenRazer 3.12.5 (f7626d0003e03a43f7ea8b449140c81426dc3eb2).
 
 diff --git a/driver/razercommon.c b/driver/razercommon.c
 index 4e8548a..429b51b 100644
@@ -173,7 +173,7 @@ index 4e8548a..429b51b 100644
 +    return 0;
 +}
 diff --git a/driver/razercommon.h b/driver/razercommon.h
-index 54651a9..0d47cf0 100644
+index 1d3e7a9..c11f7fd 100644
 --- a/driver/razercommon.h
 +++ b/driver/razercommon.h
 @@ -33,6 +33,16 @@ do { \
@@ -211,7 +211,7 @@ index 54651a9..0d47cf0 100644
  // Convenience functions
  unsigned char clamp_u8(unsigned char value, unsigned char min, unsigned char max);
 diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
-index 5d9e2bd..d6657b5 100644
+index 7fa526f..8f05b81 100644
 --- a/driver/razerkbd_driver.c
 +++ b/driver/razerkbd_driver.c
 @@ -28,6 +28,12 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
@@ -227,7 +227,7 @@ index 5d9e2bd..d6657b5 100644
  
  // KEY_MACRO* has been added in Linux 5.5, so define ourselves for older kernels.
  // See also https://git.kernel.org/torvalds/c/b5625db
-@@ -419,6 +425,8 @@ static int razer_get_report(struct usb_device *usb_dev, struct razer_report *req
+@@ -404,6 +410,8 @@ static int razer_get_report(struct usb_device *usb_dev, struct razer_report *req
      return razer_get_usb_response(usb_dev, report_index, request, response_index, response, wait_min, wait_max);
  }
  
@@ -236,7 +236,7 @@ index 5d9e2bd..d6657b5 100644
  /**
   * Send report to the keyboard, but without even reading the response
   */
-@@ -430,6 +438,13 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
+@@ -415,6 +423,13 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
      /* Except the caller to have set the transaction_id */
      WARN_ON(request->transaction_id.id == 0x00);
  
@@ -250,7 +250,7 @@ index 5d9e2bd..d6657b5 100644
      razer_get_report_params(device->usb_dev, &report_index, &response_index, &wait_min, &wait_max);
      return razer_send_control_msg(device->usb_dev, request, report_index, wait_min, wait_max);
  }
-@@ -437,17 +452,23 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
+@@ -422,17 +437,23 @@ static int razer_send_payload_no_response(struct razer_kbd_device *device, struc
  /**
   * Function to send to device, get response, and actually check the response
   */
@@ -277,7 +277,7 @@ index 5d9e2bd..d6657b5 100644
          return err;
      }
  
-@@ -456,7 +477,7 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
+@@ -441,7 +462,7 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
          response->command_class != request->command_class ||
          response->command_id.id != request->command_id.id) {
          print_erroneous_report(response, "razerkbd", "Response doesn't match request");
@@ -286,7 +286,7 @@ index 5d9e2bd..d6657b5 100644
      }
  
      switch (response->status) {
-@@ -478,6 +499,19 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
+@@ -463,6 +484,19 @@ static int razer_send_payload(struct razer_kbd_device *device, struct razer_repo
      return 0;
  }
  
@@ -306,7 +306,7 @@ index 5d9e2bd..d6657b5 100644
  /**
   * Reads the physical layout of the keyboard.
   *
-@@ -647,7 +681,7 @@ static void razer_set_device_mode(struct razer_kbd_device *device, unsigned char
+@@ -632,7 +666,7 @@ static void razer_set_device_mode(struct razer_kbd_device *device, unsigned char
          return;
      }
  
@@ -315,7 +315,7 @@ index 5d9e2bd..d6657b5 100644
  }
  
  /**
-@@ -4970,15 +5004,27 @@ static int razer_kbd_input_mapping(struct hid_device *hdev, struct hid_input *hi
+@@ -4955,15 +4989,27 @@ static int razer_kbd_input_mapping(struct hid_device *hdev, struct hid_input *hi
  
  static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *intf, struct hid_device *hdev)
  {
@@ -349,7 +349,7 @@ index 5d9e2bd..d6657b5 100644
  }
  
  /**
-@@ -4987,13 +5033,16 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
+@@ -4972,13 +5018,16 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
  static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
  {
      int retval = 0;
@@ -369,7 +369,7 @@ index 5d9e2bd..d6657b5 100644
          return -ENOMEM;
      }
  
-@@ -5001,7 +5050,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -4986,7 +5035,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
      razer_kbd_init(dev, intf, hdev);
  
      // Other interfaces are actual key-emitting devices
@@ -378,7 +378,7 @@ index 5d9e2bd..d6657b5 100644
          // If the currently bound device is the control (mouse) interface
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
-@@ -5012,7 +5061,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -4997,7 +5046,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
  
@@ -387,7 +387,7 @@ index 5d9e2bd..d6657b5 100644
  
          case USB_DEVICE_ID_RAZER_NOSTROMO:
              CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
-@@ -5498,10 +5547,11 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5483,10 +5532,11 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
          // Set device to regular mode, not driver mode
          // When the daemon discovers the device it will instruct it to enter driver mode
          // Tartarus Pro resets when it receives this command
@@ -401,7 +401,7 @@ index 5d9e2bd..d6657b5 100644
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_super);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_tab);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_f4);
-@@ -5521,7 +5571,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5506,7 +5556,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
      }
  
      // Leave autosuspend on for laptops
@@ -410,7 +410,7 @@ index 5d9e2bd..d6657b5 100644
          usb_disable_autosuspend(usb_dev);
      }
  
-@@ -5540,13 +5590,11 @@ exit_free:
+@@ -5525,13 +5575,11 @@ exit_free:
  static void razer_kbd_disconnect(struct hid_device *hdev)
  {
      struct razer_kbd_device *dev;
@@ -425,7 +425,7 @@ index 5d9e2bd..d6657b5 100644
          // If the currently bound device is the control (mouse) interface
          device_remove_file(&hdev->dev, &dev_attr_version);
          device_remove_file(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
-@@ -5557,7 +5605,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -5542,7 +5590,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
          device_remove_file(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
          device_remove_file(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
  
@@ -434,7 +434,7 @@ index 5d9e2bd..d6657b5 100644
  
          case USB_DEVICE_ID_RAZER_NOSTROMO:
              device_remove_file(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
-@@ -6039,7 +6087,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -6024,7 +6072,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
              device_remove_file(&hdev->dev, &dev_attr_macro_led_effect);              // Change macro LED effect (static, flashing)
              break;
          }
@@ -443,7 +443,7 @@ index 5d9e2bd..d6657b5 100644
          device_remove_file(&hdev->dev, &dev_attr_key_super);
          device_remove_file(&hdev->dev, &dev_attr_key_alt_tab);
          device_remove_file(&hdev->dev, &dev_attr_key_alt_f4);
-@@ -6047,7 +6095,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -6032,7 +6080,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
  
      hid_hw_stop(hdev);
      kfree(dev);
@@ -452,7 +452,7 @@ index 5d9e2bd..d6657b5 100644
  }
  
  /**
-@@ -6196,6 +6244,8 @@ static const struct hid_device_id razer_devices[] = {
+@@ -6181,6 +6229,8 @@ static const struct hid_device_id razer_devices[] = {
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_HUNTSMAN_V3_PRO_8KHZ) },
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2024) },
      { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2025) },

@@ -41,7 +41,7 @@ device table and the OpenRazer route constants. Then the device catalog,
   status, devices, battery and watch; doctor, report and support-bundle;
   bench, capture, stall-check and probe receiver.
 - The patched OpenRazer drivers (`integrations/openrazer`) run in the
-  kernel. They are OpenRazer 3.12.4's `razerkbd` and `razermouse`, changed
+  kernel. They are OpenRazer 3.12.5's `razerkbd` and `razermouse`, changed
   to accept the bridge's virtual devices as well.
 - The OpenRGB plugin (`integrations/openrgb`) loads inside OpenRGB. It shows
   the receiver's devices as OpenRGB controllers and adds a battery page.
@@ -288,9 +288,10 @@ openrazer-daemon (user) --sysfs--> razerkbd/razermouse (patched)
 The keeper reads the SET from `/dev/uhid` and hands it to the bridge, which
 runs the exchange itself. Because the bridge acknowledges the SET first,
 OpenRazer's GET is already waiting when the response arrives, and the bridge
-answers it with the matched response or an error envelope. The keeper passes
-both to the kernel. The cost is one socket hop each way, about 0.3 ms per
-exchange on the simulator (section 6).
+answers it with the matched response or an error envelope (for OpenRazer's
+virtual devices, a failed GET). The keeper passes both to the kernel. The
+cost is one socket hop each way, about 0.3 ms per exchange on the simulator
+(section 6).
 
 ### Lighting through OpenRGB (the plugin package)
 
@@ -339,6 +340,19 @@ its sandbox and gets a read-only module parameter instead:
 `/sys/module/<module>/parameters/hyperflux_native_transport`. The Python
 test checks that the patch contains these values.
 
+The second contract is OpenRazer's own virtual devices.
+`integrations/openrazer/next/` carries them as a patch for OpenRazer master,
+the one proposed to OpenRazer, until a release has them. The device is the
+same, under the `openrazer-virtual/v1/` prefix. There's no envelope: the
+bridge fails the GET, and the driver returns `EIO` without asking again.
+The loaded module shows the prefix in the read-only parameter
+`virtual_phys`, and `modinfo -F parm` lists that parameter without its
+value, which is what Doctor checks in the installed file. The bridge reads
+both parameters of each module and makes each device for the contract its
+driver has (`Contract` in `openrazer.rs`). A template for our own patch
+goes to the keeper exactly as before the field existed, so a keeper and a
+bridge from either side of an update still agree.
+
 The virtual device (UHID_CREATE2):
 
 | Field | Value |
@@ -380,10 +394,12 @@ Missing files are skipped.
   four OpenRazer modules in catalog order, then `uhid`, one per line.
 - `integrations/openrazer/patches/*.patch`: contains the phys prefix, the
   capability name and value, `HFXNERR1`, and the descriptor bytes as `0x..`
-  literals in order.
+  literals in order. `integrations/openrazer/next/patches/*.patch` has the
+  `openrazer-virtual/v1/` prefix, `virtual_phys` and the same bytes, and no
+  `HFXNERR1`.
 
 Each device's command list holds every command (class, id, data sizes) that
-OpenRazer 3.12.4 or OpenRGB 1.1 sends it, including the queries OpenRGB
+OpenRazer 3.12.5 or OpenRGB 1.1 sends it, including the queries OpenRGB
 makes while it builds a controller:
 
 - 0f/81 with 80 bytes
@@ -557,8 +573,11 @@ OpenRazer drivers.
 Upstream pins are `KEY=value` lines, readable by make and by sh alike.
 `integrations/openrazer/PIN` has:
 
-- `OPENRAZER_VERSION=3.12.4`
-- `OPENRAZER_COMMIT=1ef8a91712906a89fd332a2ed62bbd105315d6d1`
+- `OPENRAZER_VERSION=3.12.5`
+- `OPENRAZER_COMMIT=f7626d0003e03a43f7ea8b449140c81426dc3eb2`
+- `OPENRAZER_DEBIAN_DAEMON=3.12.4+dfsg-1`, the `openrazer-driver-dkms`
+  version the Debian package provides: Debian's and Ubuntu's daemon
+  depends on exactly its own version
 - `OPENRAZER_REPO=https://github.com/openrazer/openrazer.git`
 
 `integrations/openrgb/PIN` has:
@@ -811,6 +830,13 @@ example with no `/dev/uhid` yet or `EHOSTDOWN` at boot. The bridge then asks
 for it again after 1 s, 5 s and 30 s, and with the next reading. Readings
 older than 30 minutes (`hfx_proto::present::BATTERY_STALE_AFTER_MS`) are
 stale in the protocol, but UPower keeps showing them.
+
+OpenRazer's driver shows no battery of its own today. Its pull request 2868
+would add one to each device it drives, the virtual ones included, and the
+desktop would list every battery twice. So on each `hid` or `power_supply`
+uevent the bridge looks for a power supply under each virtual device it
+made, and withdraws its own battery device for that lane while there is
+one.
 
 ### Battery probes
 
@@ -1131,7 +1157,7 @@ Line budgets per part:
 
 | Part | Budget |
 | --- | --- |
-| hfx-bridge | 16,500 |
+| hfx-bridge | 17,000 |
 | hyperfluxctl | 9,000 |
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |
@@ -1494,7 +1520,7 @@ keyboard input.
 
 ### Device catalog
 
-Every device that OpenRazer 3.12.4 or OpenRGB 1.1 can drive gets a route.
+Every device that OpenRazer 3.12.5 or OpenRGB 1.1 can drive gets a route.
 The tier says what's known: `tested` through the receiver, `checked` against
 Razer's list and the upstream drivers, or `listed` when neither drives it.
 Razer's side of the check is a dated `[sources]` snapshot, because Razer's

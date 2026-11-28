@@ -3,6 +3,7 @@
 //! What the bridge and the keeper need from the host besides receivers:
 //! `/dev/uhid`, the OpenRazer drivers in sysfs, uevents and signals.
 
+use hfx_proto::openrazer::Contract;
 use rustix::fd::{BorrowedFd, OwnedFd};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -118,8 +119,8 @@ impl OpenRazerEnv {
 
     /// Whether the loaded `driver` is the HyperFlux build of OpenRazer.
     #[must_use]
-    pub fn capable(&self, driver: &str) -> bool {
-        capability(&self.sys_module, driver)
+    pub fn contract(&self, driver: &str) -> Option<Contract> {
+        contract(&self.sys_module, driver)
     }
 }
 
@@ -136,14 +137,15 @@ pub fn stop_on_signals() -> io::Result<OwnedFd> {
     Ok(OwnedFd::from(read))
 }
 
-/// The parameter reads back with a trailing newline.
+/// Which virtual devices the loaded `driver` takes, by its parameter. A
+/// parameter reads back with a trailing newline.
 #[must_use]
-pub fn capability(sys_module: &Path, driver: &str) -> bool {
-    let path = sys_module
-        .join(driver)
-        .join("parameters")
-        .join(hfx_proto::openrazer::CAPABILITY_NAME);
-    std::fs::read_to_string(path).is_ok_and(|v| v.trim() == hfx_proto::openrazer::CAPABILITY_VALUE)
+pub fn contract(sys_module: &Path, driver: &str) -> Option<Contract> {
+    [Contract::Native, Contract::Virtual].into_iter().find(|t| {
+        let (name, value) = t.parameter();
+        let path = sys_module.join(driver).join("parameters").join(name);
+        std::fs::read_to_string(path).is_ok_and(|v| v.trim() == value)
+    })
 }
 
 #[cfg(test)]
@@ -168,17 +170,23 @@ mod tests {
     }
 
     #[test]
-    fn capability_parameter() {
+    fn driver_parameters() {
         let dir = tempfile::tempdir().unwrap();
         let params = dir.path().join("razermouse/parameters");
         std::fs::create_dir_all(&params).unwrap();
-        assert!(!capability(dir.path(), "razermouse"));
+        assert_eq!(contract(dir.path(), "razermouse"), None);
         std::fs::write(
             params.join("hyperflux_native_transport"),
             "razer-feature-report-v1\n",
         )
         .unwrap();
-        assert!(capability(dir.path(), "razermouse"));
-        assert!(!capability(dir.path(), "razerkbd"));
+        assert_eq!(contract(dir.path(), "razermouse"), Some(Contract::Native));
+        assert_eq!(contract(dir.path(), "razerkbd"), None);
+        let params = dir.path().join("razerkbd/parameters");
+        std::fs::create_dir_all(&params).unwrap();
+        std::fs::write(params.join("virtual_phys"), "openrazer-virtual/v2/\n").unwrap();
+        assert_eq!(contract(dir.path(), "razerkbd"), None);
+        std::fs::write(params.join("virtual_phys"), "openrazer-virtual/v1/\n").unwrap();
+        assert_eq!(contract(dir.path(), "razerkbd"), Some(Contract::Virtual));
     }
 }

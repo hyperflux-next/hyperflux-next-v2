@@ -18,7 +18,7 @@
 #                     "(Wireless)"; OpenRGB's name when OpenRazer lacks it
 #   tier              tested   used through the receiver on real hardware
 #                     checked  Razer lists it for the HyperFlux V2, OpenRazer
-#                              3.12.4 or OpenRGB 1.1 drives it, and the entry
+#                              3.12.5 or OpenRGB 1.1 drives it, and the entry
 #                              matches theirs; not yet tested through the
 #                              receiver
 #                     listed   Razer lists it, but neither release drives it
@@ -32,12 +32,12 @@
 #                     device's own; below 6000 only with hyperfluxctl bench
 #                     results from the device itself
 #   commands          "class:id:sizes" the device accepts through a route,
-#                     the union of what OpenRazer 3.12.4 and OpenRGB 1.1
+#                     the union of what OpenRazer 3.12.5 and OpenRGB 1.1
 #                     send, and the settings recorded from Synapse on that
 #                     model (sources.synapse). The two that only OpenRGB
 #                     drives also keep 00:84:2, which bench sends first to
 #                     every device.
-#   [device.openrazer]  present when OpenRazer 3.12.4 supports the device;
+#   [device.openrazer]  present when OpenRazer 3.12.5 supports the device;
 #                       event_file_regex is left out when the daemon class
 #                       has none; key_event_link is the suffix of the by-id
 #                       link the udev rule creates for Ripple (keyboards),
@@ -143,7 +143,7 @@ columns = 2
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_NAGA_V2_PRO_WIRELESS"
+openrazer = "3.12.5 razermouse USB_DEVICE_ID_RAZER_NAGA_V2_PRO_WIRELESS"
 openrgb = "1.1 naga_pro_v2_wireless_device"
 public = ["openrazer#1952", "openrazer#1991", "openrazer#2113"]
 reports = []
@@ -202,7 +202,7 @@ columns = 13
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_WIRELESS"
+openrazer = "3.12.5 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_WIRELESS"
 openrgb = "1.1 basilisk_v3_pro_wireless_device"
 public = ["openrazer#1926", "openrazer#2589", "openrazer#2817"]
 reports = []
@@ -255,7 +255,7 @@ columns = 11
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_COBRA_PRO_WIRELESS"
+openrazer = "3.12.5 razermouse USB_DEVICE_ID_RAZER_COBRA_PRO_WIRELESS"
 openrgb = "1.1 cobra_pro_wireless_device"
 public = ["openrazer#2105", "openrazer#2179"]
 reports = []
@@ -322,7 +322,7 @@ columns = 13
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_35K_WIRELESS"
+openrazer = "3.12.5 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_35K_WIRELESS"
 openrgb = "1.1 basilisk_v3_pro_35k_wireless_device"
 public = ["openrazer#2681"]
 synapse = "4.0.896 2026-11-10"
@@ -382,7 +382,7 @@ columns = 13
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_35K_PHANTOM_GREEN_EDITION_WIRELESS"
+openrazer = "3.12.5 razermouse USB_DEVICE_ID_RAZER_BASILISK_V3_PRO_35K_PHANTOM_GREEN_EDITION_WIRELESS"
 openrgb = "1.1 basilisk_v3_pro_35k_pg_wireless_device"
 public = ["openrazer#2517"]
 reports = []
@@ -512,7 +512,7 @@ columns = 22
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V3_PRO_WIRELESS"
+openrazer = "3.12.5 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V3_PRO_WIRELESS"
 openrgb = "1.1 blackwidow_v3_pro_wireless_device"
 public = ["openrazer#1279", "openrazer#1322", "openrazer#2024"]
 reports = []
@@ -561,7 +561,7 @@ columns = 22
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_DEATHSTALKER_V2_PRO_WIRELESS"
+openrazer = "3.12.5 razerkbd USB_DEVICE_ID_RAZER_DEATHSTALKER_V2_PRO_WIRELESS"
 openrgb = "1.1 deathstalker_v2_pro_wireless_device"
 public = ["openrazer#1907", "openrazer#2001", "openrazer#2213"]
 reports = []
@@ -617,7 +617,7 @@ columns = 17
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_DEATHSTALKER_V2_PRO_TKL_WIRELESS"
+openrazer = "3.12.5 razerkbd USB_DEVICE_ID_RAZER_DEATHSTALKER_V2_PRO_TKL_WIRELESS"
 openrgb = "1.1 deathstalker_v2_pro_tkl_wireless_device"
 public = ["openrazer#1892"]
 synapse = "4.0.896 2026-11-10"
@@ -660,7 +660,7 @@ key_link_overlaps = ["RazerBlackWidowV4MiniHyperSpeedWired"]
 
 [device.sources]
 razer = ["razer-hyperflux-v2", "razer-hyperflux-v2-launch"]
-openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V4_MINI_HYPERSPEED_WIRELESS"
+openrazer = "3.12.5 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V4_MINI_HYPERSPEED_WIRELESS"
 public = ["openrazer#2272", "openrazer#2585"]
 reports = []
 
@@ -753,7 +753,7 @@ columns = 18
 
 [device.sources]
 razer = ["razer-hyperflux-v2"]
-openrazer = "3.12.4 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V4_TENKEYLESS_HYPERSPEED_WIRELESS"
+openrazer = "3.12.5 razerkbd USB_DEVICE_ID_RAZER_BLACKWIDOW_V4_TENKEYLESS_HYPERSPEED_WIRELESS"
 openrgb = "1.1 blackwidow_v4_tkl_wireless_device"
 public = ["openrazer#2554", "openrazer#2579"]
 reports = []

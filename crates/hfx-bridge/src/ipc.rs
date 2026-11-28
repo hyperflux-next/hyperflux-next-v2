@@ -13,6 +13,7 @@
 use hfx_proto::framing::{FrameReader, encode_frame};
 use hfx_proto::ids::{HexBytes, ReceiverId, ReportHex};
 use hfx_proto::messages::Lane;
+use hfx_proto::openrazer::Contract;
 use rustix::fd::{AsFd, BorrowedFd};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
@@ -105,15 +106,28 @@ pub enum ToKeeper {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Template {
-    /// The feature-only device the patched OpenRazer drivers bind.
+    /// The feature-only device the OpenRazer drivers bind, for the
+    /// contract the loaded driver takes. A template from a bridge older
+    /// than the field means our own patch, and one for it is sent the
+    /// old way, so a keeper and a bridge either side of an update agree.
     #[serde(rename = "openrazer")]
-    OpenRazer { product_id: u16, label: String },
+    OpenRazer {
+        product_id: u16,
+        label: String,
+        #[serde(default, skip_serializing_if = "native")]
+        contract: Contract,
+    },
     /// A mouse or keyboard collection that never sends, and battery report 2.
     Battery {
         receiver: ReceiverId,
         lane: Lane,
         product_id: u16,
     },
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde passes a reference
+fn native(contract: &Contract) -> bool {
+    *contract == Contract::Native
 }
 
 /// The hex digits of a receiver id as `bridge::receiver_id` makes it.
@@ -278,9 +292,36 @@ mod tests {
     #[test]
     fn shapes_are_fixed() {
         let create = r#"{"kind":"create","device":17,"template":{"openrazer":{"product_id":205,"label":"native-0123456789abcdef"}}}"#;
-        let Some(ToKeeper::Create { device: 17, .. }) = to_keeper(create) else {
+        let Some(ToKeeper::Create {
+            device: 17,
+            template,
+        }) = to_keeper(create)
+        else {
             panic!("{create}")
         };
+        // Without the field it's our own patch, and that's how it goes out
+        // again, so a keeper from before the field still takes it.
+        let Template::OpenRazer { contract, .. } = &template else {
+            panic!("{template:?}")
+        };
+        assert_eq!(*contract, Contract::Native);
+        let back = serde_json::to_string(&ToKeeper::Create {
+            device: 17,
+            template,
+        })
+        .unwrap();
+        assert_eq!(back, create);
+        let virtual_ = create.replace(r#""label""#, r#""contract":"virtual","label""#);
+        let Some(ToKeeper::Create { template, .. }) = to_keeper(&virtual_) else {
+            panic!("{virtual_}")
+        };
+        assert!(matches!(
+            template,
+            Template::OpenRazer {
+                contract: Contract::Virtual,
+                ..
+            }
+        ));
         let battery = ToKeeper::Create {
             device: 18,
             template: Template::Battery {

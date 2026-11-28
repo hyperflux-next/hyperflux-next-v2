@@ -191,7 +191,11 @@ sudo rpm-ostree uninstall hyperflux-next-v2-linux
 ```
 
 `--apply-live` makes Core usable at once, and its units can be enabled
-before the reboot.
+before the reboot. rpm-ostree does one thing at a time, so while the system
+updates itself it answers "Transaction in progress": wait until
+`rpm-ostree status` says idle. If an update is waiting for a reboot,
+`--apply-live` refuses with "packages would be changed". Layer without it,
+reboot, then enable the units.
 
 On Aeon and Kalpa, everything happens in a new snapshot, which starts at
 the next boot. Note your user id first (`id -u`), because inside the

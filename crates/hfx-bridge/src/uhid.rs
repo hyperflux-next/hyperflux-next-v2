@@ -4,7 +4,9 @@
 //! needs. Events are the full 4376-byte packed structure in native byte
 //! order. The kernel accepts shorter writes, but one size keeps it simple.
 
-use hfx_proto::openrazer::{BUS_VIRTUAL, DESCRIPTOR, PHYS_PREFIX, UHID_VERSION};
+use hfx_proto::openrazer::{
+    BUS_VIRTUAL, DESCRIPTOR, PHYS_PREFIX, UHID_VERSION, VIRTUAL_PHYS_PREFIX,
+};
 use hfx_proto::report::{REPORT_LEN, Report};
 
 pub const EVENT_BYTES: usize = 4376;
@@ -129,17 +131,20 @@ pub fn create_device(
     out
 }
 
-/// The feature-only device the patched OpenRazer drivers trust: phys under
-/// the HyperFlux prefix, our descriptor, no uniq.
+/// The feature-only device the OpenRazer drivers trust: phys under one of
+/// the two prefixes, our descriptor, no uniq.
 ///
 /// # Panics
-/// If `label` is not a valid label, which the callers rule out.
+/// If `phys` is not a prefix and a valid label, which the callers rule out.
 #[must_use]
-pub fn create(name: &str, label: &str, product_id: u16) -> Vec<u8> {
-    assert!(hfx_proto::openrazer::label_ok(label));
+pub fn create(name: &str, phys: &str, product_id: u16) -> Vec<u8> {
+    let label = [PHYS_PREFIX, VIRTUAL_PHYS_PREFIX]
+        .iter()
+        .find_map(|prefix| phys.strip_prefix(prefix));
+    assert!(label.is_some_and(hfx_proto::openrazer::label_ok));
     create_device(
         name,
-        &format!("{PHYS_PREFIX}{label}"),
+        phys,
         "",
         (hfx_proto::devices::RECEIVER.vendor_id, product_id),
         &DESCRIPTOR,
@@ -301,7 +306,7 @@ mod tests {
     fn create_keeps_the_trusted_identity() {
         let bytes = create(
             "Razer Basilisk V3 Pro 35K",
-            "native-0123456789abcdef",
+            "hyperflux-next/native/v1/native-0123456789abcdef",
             0x00cd,
         );
         assert_eq!(bytes.len(), EVENT_BYTES);
@@ -321,6 +326,21 @@ mod tests {
         // uniq and country stay zero.
         assert!(bytes[196..260].iter().all(|b| *b == 0));
         assert!(bytes[276..280].iter().all(|b| *b == 0));
+        let phys = "openrazer-virtual/v1/native-0123456789abcdef";
+        let bytes = create("Razer Basilisk V3 Pro 35K", phys, 0x00cd);
+        assert!(
+            matches!(decode_written(&bytes), Some(Written::Create { phys: p, .. }) if p == phys)
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed")]
+    fn create_refuses_other_phys() {
+        let _ = create(
+            "Razer Basilisk V3 Pro 35K",
+            "hyperflux-next/battery/x",
+            0x00cd,
+        );
     }
 
     #[test]

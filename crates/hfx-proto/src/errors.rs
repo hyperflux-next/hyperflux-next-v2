@@ -351,7 +351,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         "HFX-402",
         E,
         "The installed OpenRazer driver isn't the HyperFlux Next V2 build.",
-        "{module} doesn't advertise the hyperflux_native_transport capability.",
+        "{module} takes no virtual devices: it has neither hyperflux_native_transport nor virtual_phys.",
         "Reinstall hyperflux-next-v2-openrazer-driver-dkms, then reboot.",
         "Run hyperfluxctl doctor again and check that the OpenRazer driver is ready.",
     ),

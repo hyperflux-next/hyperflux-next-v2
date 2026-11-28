@@ -5,8 +5,8 @@
 # OpenRGB 1.1 from openrgb.org, whose Fedora 44 package runs on Fedora's
 # own Qt 6. openSUSE has no such package and gets no plugin.
 
-%global openrazer_version 3.12.4
-%global openrazer_commit 1ef8a91712906a89fd332a2ed62bbd105315d6d1
+%global openrazer_version 3.12.5
+%global openrazer_commit f7626d0003e03a43f7ea8b449140c81426dc3eb2
 %global openrgb_commit 8e16de27858cf2be6af54a33ce003df74cb9fd3e
 # The bridge, the keeper and the proxy go in libexec, where SELinux lets
 # systemd run them unconfined (Makefile, LIBEXECDIR).
@@ -27,7 +27,7 @@
 %global old_names 1:1.0.1
 
 Name:           hyperflux-next-v2
-Version:        1.0.7
+Version:        1.0.8
 Release:        1%{?dist}
 Summary:        Razer devices on a HyperFlux V2 receiver
 License:        GPL-2.0-only
@@ -291,6 +291,9 @@ fi
 %endif
 
 %changelog
+* Sat Nov 28 2026 offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com> - 1.0.8-1
+- HyperFlux Next V2 1.0.8
+
 * Wed Nov 25 2026 offalexjackson777-stack <offalexjackson777-stack@users.noreply.github.com> - 1.0.7-1
 - HyperFlux Next V2 1.0.7
 

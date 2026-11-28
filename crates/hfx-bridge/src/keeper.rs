@@ -137,7 +137,11 @@ type Made = (Vec<u8>, String, String, Option<&'static str>);
 
 fn made(template: &Template) -> Result<Made, &'static str> {
     match template {
-        Template::OpenRazer { product_id, label } => {
+        Template::OpenRazer {
+            product_id,
+            label,
+            contract,
+        } => {
             let entry = devices::device(*product_id).ok_or("a product the catalog lacks")?;
             let openrazer = entry.openrazer.as_ref();
             let driver = openrazer.ok_or("a product OpenRazer doesn't drive")?.driver;
@@ -145,10 +149,10 @@ fn made(template: &Template) -> Result<Made, &'static str> {
             let hex_ok =
                 hex.len() == 16 && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
             if !hex_ok || !hfx_proto::openrazer::label_ok(label) {
-                return Err("a phys label the patched drivers don't take");
+                return Err("a phys label the OpenRazer drivers don't take");
             }
-            let phys = format!("{}{label}", hfx_proto::openrazer::PHYS_PREFIX);
-            let create = uhid::create(entry.name, label, *product_id);
+            let phys = format!("{}{label}", contract.phys_prefix());
+            let create = uhid::create(entry.name, &phys, *product_id);
             Ok((create, phys, entry.name.to_owned(), Some(driver)))
         }
         Template::Battery {

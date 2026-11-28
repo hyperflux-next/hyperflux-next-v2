@@ -78,6 +78,17 @@ pub fn bound_device(hid_drivers: &Path, driver: &str, phys: &str) -> io::Result<
     Ok(None)
 }
 
+/// Whether the device `driver` bound for `phys` has a power supply of
+/// its own, which the driver registers under it.
+#[must_use]
+pub fn driver_battery(hid_drivers: &Path, driver: &str, phys: &str) -> bool {
+    let Ok(Some(name)) = bound_device(hid_drivers, driver, phys) else {
+        return false;
+    };
+    let supplies = hid_drivers.join(driver).join(name).join("power_supply");
+    std::fs::read_dir(supplies).is_ok_and(|mut d| d.next().is_some())
+}
+
 #[must_use]
 pub fn still_bound(hid_drivers: &Path, driver: &str, name: &str) -> bool {
     hid_drivers.join(driver).join(name).exists()

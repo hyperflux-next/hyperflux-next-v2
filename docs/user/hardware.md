@@ -17,7 +17,7 @@ The status column has three values.
   charging, and lighting from OpenRazer and OpenRGB, plus Ripple on the
   keyboard.
 - checked: Razer lists the device as working with the HyperFlux V2.
-  OpenRazer 3.12.4 or OpenRGB 1.1 supports it, and the entry in
+  OpenRazer 3.12.5 or OpenRGB 1.1 supports it, and the entry in
   `devices.toml` matches theirs. It is
   not tested through the receiver. `hyperfluxctl` and the OpenRGB page
   say `not yet tested through the receiver`.
@@ -81,7 +81,7 @@ again. `hyperfluxctl` and the OpenRGB page then say
 `charging not reported` for them.
 
 The Naga V3 Pro and the BlackWidow V4 Low-Profile TKL HyperSpeed get both
-questions too, even though neither OpenRazer 3.12.4 nor OpenRGB 1.1 reads
+questions too, even though neither OpenRazer 3.12.5 nor OpenRGB 1.1 reads
 the battery of either one. Owners' captures and open OpenRazer pull requests
 show both answering the battery question on their own dongles. The same
 captures show them answering the charging question, with 1 on their cables.

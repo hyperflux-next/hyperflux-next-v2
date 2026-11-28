@@ -27,7 +27,7 @@ These are checked:
 - BlackWidow V4 Tenkeyless HyperSpeed
 
 Razer lists them for the receiver, and each one works with OpenRazer
-3.12.4 or OpenRGB 1.1, the releases HyperFlux Next V2 builds on, but they
+3.12.5 or OpenRGB 1.1, the releases HyperFlux Next V2 builds on, but they
 are not tested through the receiver. `hyperfluxctl` and the OpenRGB page
 label them `not yet tested through the receiver`, and their charging state
 may not show.

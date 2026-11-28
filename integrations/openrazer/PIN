@@ -1,6 +1,10 @@
 # OpenRazer release the patches apply to. The checksum is of the GitHub
 # archive of the commit, which is also what package recipes download.
 OPENRAZER_REPO=https://github.com/openrazer/openrazer.git
-OPENRAZER_VERSION=3.12.4
-OPENRAZER_COMMIT=1ef8a91712906a89fd332a2ed62bbd105315d6d1
-OPENRAZER_SHA256=ffda843601ad4bfaf35a555dbe0c40d9dfbc6fe8df74033f3c2ab2216d14278b
+OPENRAZER_VERSION=3.12.5
+OPENRAZER_COMMIT=f7626d0003e03a43f7ea8b449140c81426dc3eb2
+OPENRAZER_SHA256=c4d883b9e927dfee92bddf772e5b2a0c30a58e7eebf944ebcd3d514eb63575d2
+# Debian's and Ubuntu's openrazer-daemon depends on exactly its own version
+# of openrazer-driver-dkms, which the driver package provides in its place.
+# It stays at the version those releases ship until they move.
+OPENRAZER_DEBIAN_DAEMON=3.12.4+dfsg-1
