@@ -1,0 +1,289 @@
+Give razerkbd and razermouse a serial_sha256 attribute
+
+hyperflux-next-bridge leaves out its virtual device while a wired device
+of the same model is plugged in, since that is usually the same unit on
+its cable. It can't tell a second unit apart: device_serial is readable
+only by OpenRazer's group, and the bridge runs as a system user outside
+it.
+
+serial_sha256 holds the SHA-256 of the serial that device_serial shows,
+as 64 lowercase hex digits, and anyone may read it. NUL and white space
+at both ends are trimmed first, as the bridge trims the serial it reads
+through the receiver, so the same serial gives the same hash on both
+sides. An empty serial, or one with anything but printable ASCII left,
+has none, and reading fails with ENODATA.
+
+The first read asks the device, and later reads get the kept hash. The
+bridge reads the file whenever a HID device comes or goes, including
+while the cable is being pulled. A read that waits on a device being
+removed holds up the removal: on 2026-11-23 one died in the kernel, and
+the USB hub's worker waited for it from then on. A device that is going
+away isn't asked. One that didn't answer is asked again after ten
+seconds at the earliest.
+
+Only USB devices get it: not the virtual devices, and not Blade laptops,
+whose serial comes from DMI and only root may read.
+
+Serials are short and follow a pattern, so trying candidates against the
+hash would find one. The hash keeps the serial out of plain sight; it
+doesn't make it secret.
+
+Applies to OpenRazer master (f5d547093d30fb2efa9c57469a1a30a0a1a279a5) after 0001.
+
+diff --git a/driver/razercommon.c b/driver/razercommon.c
+index ee6449d..8689d62 100644
+--- a/driver/razercommon.c
++++ b/driver/razercommon.c
+@@ -392,3 +392,85 @@ int razer_send_argb_msg(struct hid_device* hdev, unsigned char channel, size_t s
+ 
+     return ret;
+ }
++
++/*
++ * serial_sha256 for hyperflux-next-bridge, which can't read device_serial
++ * (only OpenRazer's group may) and only needs to know whether a wired
++ * device is the unit it reaches through the receiver. serial holds len
++ * bytes that device_serial's show function wrote; their hash goes to out
++ * in hex, with a newline. NUL and white space at both ends go first,
++ * exactly as the bridge trims the serial it reads, and a serial that is
++ * then empty or has anything but printable ASCII gets no hash.
++ *
++ * The hash is over a fixed label and the trimmed serial, so it equals the
++ * fingerprint the bridge makes from the serial it reads through the
++ * receiver and the two can be compared. The label keeps this value from
++ * doubling as a hash of the serial on its own.
++ */
++#define RAZER_SERIAL_HASH_LABEL "hyperflux-next serial"
++
++static bool razer_serial_trim(char c)
++{
++    return !c || c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\r';
++}
++
++static ssize_t razer_serial_sha256(char *out, size_t size, const char *serial, ssize_t len)
++{
++    /* The label with its NUL, then the longest serial either driver reads. */
++    u8 message[sizeof(RAZER_SERIAL_HASH_LABEL) + 64];
++    u8 digest[SHA256_DIGEST_SIZE];
++    ssize_t start = 0, end = len, i;
++    size_t label = sizeof(RAZER_SERIAL_HASH_LABEL);
++
++    while (start < end && razer_serial_trim(serial[start]))
++        start++;
++    while (end > start && razer_serial_trim(serial[end - 1]))
++        end--;
++    if (start == end || (size_t)(end - start) > sizeof(message) - label)
++        return -ENODATA;
++    for (i = start; i < end; i++) {
++        if ((unsigned char)serial[i] < 0x21 || (unsigned char)serial[i] > 0x7e)
++            return -ENODATA;
++    }
++    memcpy(message, RAZER_SERIAL_HASH_LABEL, label);
++    memcpy(message + label, serial + start, end - start);
++    sha256(message, label + (end - start), digest);
++    return scnprintf(out, size, "%*phN\n", SHA256_DIGEST_SIZE, digest);
++}
++
++/*
++ * The show function of serial_sha256. The serial is read from the device
++ * once and its hash kept, so later reads never reach the device. The
++ * bridge reads the file whenever a HID device comes or goes, which
++ * includes the moment the cable is pulled, and a read that waits on a
++ * device being removed holds up that removal. A device that is going away
++ * isn't asked at all, and one that didn't answer is asked again ten
++ * seconds later at the earliest, so a reader doesn't sit out the USB
++ * timeouts on every read.
++ */
++ssize_t razer_serial_hash_show(struct razer_serial_hash *hash, struct hid_device *hdev,
++                               struct device *dev, char *buf, razer_show_fn read_serial)
++{
++    char hex[sizeof(hash->hex)];
++    unsigned long tried = READ_ONCE(hash->tried);
++    ssize_t len;
++
++    if (smp_load_acquire(&hash->valid))
++        return sysfs_emit(buf, "%s", hash->hex);
++    if (!hid_is_usb(hdev) || READ_ONCE(hid_to_usb_dev(hdev)->state) != USB_STATE_CONFIGURED)
++        return -ENODEV;
++    if (tried && time_before(jiffies, tried + 10 * HZ))
++        return -ENODATA;
++
++    len = read_serial(dev, NULL, buf);
++    if (len > 0)
++        len = razer_serial_sha256(hex, sizeof(hex), buf, len);
++    if (len <= 0) {
++        WRITE_ONCE(hash->tried, jiffies | 1);
++        return len < 0 ? len : -ENODATA;
++    }
++    /* Two first reads at once write the same bytes. */
++    memcpy(hash->hex, hex, sizeof(hex));
++    smp_store_release(&hash->valid, true);
++    return sysfs_emit(buf, "%s", hash->hex);
++}
+diff --git a/driver/razercommon.h b/driver/razercommon.h
+index 40601ba..c78c8e6 100644
+--- a/driver/razercommon.h
++++ b/driver/razercommon.h
+@@ -10,6 +10,7 @@
+ #include <linux/hid.h>
+ #include <linux/usb/input.h>
+ #include "compat.h"
++#include <crypto/sha2.h>
+ 
+ #define DRIVER_VERSION "3.12.1"
+ #define DRIVER_LICENSE "GPL v2"
+@@ -160,4 +161,14 @@ extern const struct kernel_param_ops razer_virtual_phys_ops;
+ #define	hid_to_usb_dev(hid_dev) \
+ 	to_usb_device(hid_dev->dev.parent->parent)
+ 
++/* serial_sha256's hash, read from the device once and kept. Zeroed with the device. */
++struct razer_serial_hash {
++    unsigned long tried; /* jiffies of the last read that failed, 0 before one */
++    bool valid;
++    char hex[SHA256_DIGEST_SIZE * 2 + 2]; /* the digits, a newline and a NUL */
++};
++typedef ssize_t (*razer_show_fn)(struct device *dev, struct device_attribute *attr, char *buf);
++ssize_t razer_serial_hash_show(struct razer_serial_hash *hash, struct hid_device *hdev,
++                               struct device *dev, char *buf, razer_show_fn read_serial);
++
+ #endif /* DRIVER_RAZERCOMMON_H_ */
+diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
+index 75ebf9b..b6741c1 100644
+--- a/driver/razerkbd_driver.c
++++ b/driver/razerkbd_driver.c
+@@ -2292,6 +2292,18 @@ exit:
+     return sysfs_emit(buf, "%s\n", serial_string);
+ }
+ 
++/**
++ * Read device file "serial_sha256"
++ *
++ * Returns the SHA-256 of the serial number, as hex
++ */
++static ssize_t razer_attr_read_serial_sha256(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    struct razer_kbd_device *device = dev_get_drvdata(dev);
++
++    return razer_serial_hash_show(&device->serial_hash, device->hdev, dev, buf, razer_attr_read_device_serial);
++}
++
+ /**
+  * Read device file "firmware_version"
+  *
+@@ -5021,6 +5033,7 @@ static DEVICE_ATTR(keyswitch_optimization,  0660, razer_attr_read_keyswitch_opti
+ static DEVICE_ATTR(device_type,             0440, razer_attr_read_device_type,                NULL);
+ static DEVICE_ATTR(device_mode,             0660, razer_attr_read_device_mode,                razer_attr_write_device_mode);
+ static DEVICE_ATTR(device_serial,           0440, razer_attr_read_device_serial,              NULL);
++static DEVICE_ATTR(serial_sha256,           0444, razer_attr_read_serial_sha256,              NULL);
+ 
+ static DEVICE_ATTR(matrix_effect_none,      0220, NULL,                                       razer_attr_write_matrix_effect_none);
+ static DEVICE_ATTR(matrix_effect_wave,      0220, NULL,                                       razer_attr_write_matrix_effect_wave);
+@@ -5604,6 +5617,9 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_serial);                         // Get serial number
++        // Not on Blades, whose serial comes from DMI, which only root may read
++        if (usb_dev && !is_blade_laptop(dev))
++            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_serial_sha256);                     // Get a hash of it
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_brightness);                     // Gets and sets the brightness
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_test);                                  // Test mode
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_type);                           // Get string of device type
+@@ -6159,6 +6175,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+         device_remove_file(&hdev->dev, &dev_attr_version);
+         device_remove_file(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
+         device_remove_file(&hdev->dev, &dev_attr_device_serial);                         // Get serial number
++        device_remove_file(&hdev->dev, &dev_attr_serial_sha256);                         // Get a hash of it
+         device_remove_file(&hdev->dev, &dev_attr_matrix_brightness);                     // Gets and sets the brightness
+         device_remove_file(&hdev->dev, &dev_attr_test);                                  // Test mode
+         device_remove_file(&hdev->dev, &dev_attr_device_type);                           // Get string of device type
+diff --git a/driver/razerkbd_driver.h b/driver/razerkbd_driver.h
+index 1a9f553..12bc599 100644
+--- a/driver/razerkbd_driver.h
++++ b/driver/razerkbd_driver.h
+@@ -7,6 +7,8 @@
+ #ifndef __HID_RAZER_KBD_H
+ #define __HID_RAZER_KBD_H
+ 
++#include "razercommon.h"
++
+ #define USB_DEVICE_ID_RAZER_BLACKWIDOW_ULTIMATE_2012 0x010D
+ // 2011 or so edition, see https://web.archive.org/web/20111113132427/http://store.razerzone.com:80/store/razerusa/en_US/pd/productID.235228400/categoryId.49136200/parentCategoryId.35156900
+ #define USB_DEVICE_ID_RAZER_BLACKWIDOW_STEALTH_EDITION 0x010E
+@@ -180,6 +182,8 @@ struct razer_kbd_device {
+ 
+     unsigned char block_keys[3];
+     unsigned char left_alt_on;
++
++    struct razer_serial_hash serial_hash;
+ };
+ 
+ struct razer_kbd_usb_device_data {
+diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
+index 10f4880..59bde21 100644
+--- a/driver/razermouse_driver.c
++++ b/driver/razermouse_driver.c
+@@ -1622,6 +1622,18 @@ static ssize_t razer_attr_read_device_serial(struct device *dev, struct device_a
+     return sysfs_emit(buf, "%s\n", serial_string);
+ }
+ 
++/**
++ * Read device file "serial_sha256"
++ *
++ * Returns the SHA-256 of the serial number, as hex
++ */
++static ssize_t razer_attr_read_serial_sha256(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    struct razer_mouse_device *device = dev_get_drvdata(dev);
++
++    return razer_serial_hash_show(&device->serial_hash, device->hdev, dev, buf, razer_attr_read_device_serial);
++}
++
+ /**
+  * Read device file "get_battery"
+  *
+@@ -6115,6 +6127,7 @@ static DEVICE_ATTR(dpi_stages,                0660, razer_attr_read_dpi_stages,
+ static DEVICE_ATTR(device_type,               0440, razer_attr_read_device_type,           NULL);
+ static DEVICE_ATTR(device_mode,               0660, razer_attr_read_device_mode,           razer_attr_write_device_mode);
+ static DEVICE_ATTR(device_serial,             0440, razer_attr_read_device_serial,         NULL);
++static DEVICE_ATTR(serial_sha256,             0444, razer_attr_read_serial_sha256,         NULL);
+ static DEVICE_ATTR(device_idle_time,          0660, razer_attr_read_device_idle_time,      razer_attr_write_device_idle_time);
+ 
+ static DEVICE_ATTR(scroll_mode,               0660, razer_attr_read_scroll_mode,           razer_attr_write_scroll_mode);
+@@ -6683,6 +6696,8 @@ static int razer_mouse_probe(struct hid_device *hdev, const struct hid_device_id
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_type);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_serial);
++        if (hid_is_usb(hdev))
++            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_serial_sha256);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_mode);
+ 
+         switch(dev->usb_pid) {
+@@ -7833,6 +7848,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
+         device_remove_file(&hdev->dev, &dev_attr_firmware_version);
+         device_remove_file(&hdev->dev, &dev_attr_device_type);
+         device_remove_file(&hdev->dev, &dev_attr_device_serial);
++        device_remove_file(&hdev->dev, &dev_attr_serial_sha256);
+         device_remove_file(&hdev->dev, &dev_attr_device_mode);
+ 
+         switch(dev->usb_pid) {
+diff --git a/driver/razermouse_driver.h b/driver/razermouse_driver.h
+index 334c3f3..6b9f9d4 100644
+--- a/driver/razermouse_driver.h
++++ b/driver/razermouse_driver.h
+@@ -6,6 +6,8 @@
+ #ifndef __HID_RAZER_MOUSE_H
+ #define __HID_RAZER_MOUSE_H
+ 
++#include "razercommon.h"
++
+ #define USB_DEVICE_ID_RAZER_OROCHI_2011 0x0013
+ #define USB_DEVICE_ID_RAZER_NAGA 0x0015
+ #define USB_DEVICE_ID_RAZER_DEATHADDER_3_5G 0x0016
+@@ -162,6 +164,7 @@ struct razer_mouse_device {
+     unsigned short usb_pid;
+ 
+     char serial[23]; // Now storing a random serial to be used with old devices that don't support it
++    struct razer_serial_hash serial_hash;
+ 
+     struct {
+         unsigned char led;

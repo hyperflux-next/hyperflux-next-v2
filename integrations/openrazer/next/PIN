@@ -1,0 +1,5 @@
+# OpenRazer commit the next patches apply to: master, until a release
+# has the virtual devices. The checksum is of the GitHub archive.
+OPENRAZER_REPO=https://github.com/openrazer/openrazer.git
+OPENRAZER_COMMIT=f5d547093d30fb2efa9c57469a1a30a0a1a279a5
+OPENRAZER_SHA256=ecf7595cf04a34761922a4d1fca8508f82765ddd3e0a4ef065ed76161453e613

@@ -18,7 +18,7 @@ use crate::decode;
 use crate::uhid;
 use hfx_proto::devices::{self, CommandRefusal, Device};
 use hfx_proto::messages::OpenRazerState;
-use hfx_proto::openrazer::{Uncertainty, envelope};
+use hfx_proto::openrazer::{Contract, Uncertainty, envelope, parse_envelope};
 use hfx_proto::report::{self, REPORT_LEN, Report};
 use sha2::{Digest, Sha256};
 
@@ -113,6 +113,8 @@ pub struct VirtualDevice {
     pub told: Option<(String, u64)>,
     /// The wired device of the model is another unit, by its serial.
     pub beside: bool,
+    /// What the driver took when the device was last published.
+    pub contract: Contract,
 }
 
 impl VirtualDevice {
@@ -142,12 +144,13 @@ impl VirtualDevice {
             known: None,
             told: None,
             beside: false,
+            contract: Contract::Native,
         }
     }
 
     #[must_use]
     pub fn phys(&self) -> String {
-        format!("{}{}", hfx_proto::openrazer::PHYS_PREFIX, self.label)
+        format!("{}{}", self.contract.phys_prefix(), self.label)
     }
 
     #[must_use]
@@ -385,6 +388,7 @@ pub struct SetState {
 pub struct Live {
     /// The device's id with the keeper.
     pub id: u64,
+    pub contract: Contract,
     pub created: u64,
     pub started: bool,
     pub stopped: bool,
@@ -454,9 +458,10 @@ fn with_storage(request: &Report, storage: u8) -> Report {
 
 impl Live {
     #[must_use]
-    pub fn new(id: u64, now: u64) -> Self {
+    pub fn new(id: u64, contract: Contract, now: u64) -> Self {
         Self {
             id,
+            contract,
             created: now,
             started: false,
             stopped: false,
@@ -491,7 +496,7 @@ impl Live {
         if !self.started {
             self.replies.push((id, uhid::EIO, None));
         } else if let Some(response) = self.response.take() {
-            self.replies.push((id, 0, Some(response)));
+            self.answer(id, response);
             self.answered(now);
         } else if self.set.is_some() {
             if let Some(older) = self.get.replace(id) {
@@ -539,6 +544,16 @@ impl Live {
             answer: None,
         });
         Some(request)
+    }
+
+    /// A GET's reply. OpenRazer's virtual devices take no envelope: a
+    /// failed GET is how that driver learns there's no response.
+    fn answer(&mut self, id: u32, response: Report) {
+        if self.contract == Contract::Virtual && parse_envelope(&response).is_some() {
+            self.replies.push((id, uhid::EIO, None));
+        } else {
+            self.replies.push((id, 0, Some(response)));
+        }
     }
 
     fn answered(&mut self, now: u64) {
@@ -592,7 +607,7 @@ impl Live {
         self.set = None;
         match self.get.take() {
             Some(id) => {
-                self.replies.push((id, 0, Some(response)));
+                self.answer(id, response);
                 self.answered(now);
             }
             None => self.response = Some(response),
@@ -849,7 +864,7 @@ mod tests {
     }
 
     fn live() -> Live {
-        Live::new(1, 0)
+        Live::new(1, Contract::Native, 0)
     }
 
     /// A SET sent once and waiting for its answer.
@@ -921,6 +936,41 @@ mod tests {
         live.set = pending(request);
         live.exchanged(SetResult::NotSent, 0, false);
         assert_eq!(live.response, Some(envelope(Uncertainty::NotSent)));
+    }
+
+    #[test]
+    fn virtual_gets_fail_instead() {
+        let mut live = Live::new(1, Contract::Virtual, 0);
+        let request = report::build(0x1f, 0x07, 0x80, &[0, 0]);
+        live.started = true;
+        // Waiting in the kernel, and kept for a later GET.
+        for get in [Some(9), None] {
+            live.set = pending(request);
+            live.get = get;
+            live.exchanged(SetResult::NotSent, 0, false);
+        }
+        live.get(10, 0);
+        assert_eq!(live.replies, [(9, uhid::EIO, None), (10, uhid::EIO, None)]);
+        // A device's own answer still goes through, whatever its status.
+        let mut failed = request;
+        failed[0] = report::STATUS_FAILURE;
+        live.replies.clear();
+        live.set = pending(request);
+        live.get = Some(11);
+        live.exchanged(SetResult::Matched(failed), 0, false);
+        assert_eq!(live.replies, [(11, uhid::EIO, None)]);
+        let write = report::build(0x1f, 0x0f, 0x04, &[1, 0, 200]);
+        live.replies.clear();
+        live.set = pending(write);
+        live.get = Some(12);
+        live.exchanged(SetResult::Matched(failed_write(write)), 0, false);
+        assert_eq!(live.replies, [(12, 0, Some(failed_write(write)))]);
+    }
+
+    fn failed_write(write: Report) -> Report {
+        let mut failed = write;
+        failed[0] = report::STATUS_FAILURE;
+        failed
     }
 
     fn answered(request: &Report) -> Report {

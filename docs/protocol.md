@@ -440,7 +440,7 @@ A Razer feature report:
 #### Command check
 
 The class, id and data size must be in the device's command list
-(`devices.toml`), which has the commands that OpenRazer 3.12.4 and OpenRGB
+(`devices.toml`), which has the commands that OpenRazer 3.12.5 and OpenRGB
 1.1 send to the device. A few models also have settings recorded from
 Razer Synapse on them: the DeathStalker V2 Pro TKL's sleep and dimming
 timers, and the Basilisk V3 Pro 35K's Smart Dimming, scroll levels and

@@ -132,6 +132,18 @@ impl Rig {
         self.or.uevents.send(message.as_bytes()).unwrap();
     }
 
+    /// A power supply came or went.
+    fn power_supply_uevent(&self) {
+        let message = "add@/devices/x/power_supply/y\0ACTION=add\0SUBSYSTEM=power_supply\0";
+        self.or.uevents.send(message.as_bytes()).unwrap();
+    }
+
+    /// A driver module was loaded or removed.
+    fn module_uevent(&self) {
+        let message = "add@/module/razermouse\0ACTION=add\0SUBSYSTEM=module\0";
+        self.or.uevents.send(message.as_bytes()).unwrap();
+    }
+
     fn serial_reads(&self, lane: Lane) -> usize {
         self.h
             .sim
@@ -365,6 +377,100 @@ fn driver_handover() {
         "one read: the serial is known"
     );
     assert_eq!(again.query(1, &battery())[0], 2);
+}
+
+/// OpenRazer's own driver, which takes virtual devices, loaded in place of
+/// ours.
+fn virtual_drivers(sys: &Path) {
+    for driver in ["razermouse", "razerkbd"] {
+        let params = sys.join("module").join(driver).join("parameters");
+        std::fs::remove_file(params.join("hyperflux_native_transport")).unwrap();
+        std::fs::write(params.join("virtual_phys"), "openrazer-virtual/v1/\n").unwrap();
+    }
+}
+
+#[test]
+fn virtual_driver() {
+    let rig = Rig::with(Options {
+        sysfs: Some(virtual_drivers),
+        ..Options::default()
+    });
+    let mouse = rig.device(0x00cd);
+    let label = mouse.phys();
+    let label = label.strip_prefix("openrazer-virtual/v1/").unwrap();
+    assert!(hfx_proto::openrazer::label_ok(label) && label.starts_with("native-"));
+    assert_eq!(mouse.query(1, &battery())[0], 2);
+    // No envelope there: with the lane leased to an app, the GET fails.
+    let (mut c, _, lease) = common::leased(&rig.h, &["native-routes"], Lane::Pointer);
+    mouse.send(&uhid::kernel_set(3, &battery()));
+    assert_eq!(mouse.recv(2000), set_reply(3, 0));
+    mouse.send(&uhid::kernel_get(4));
+    assert!(matches!(
+        mouse.recv(3000),
+        Some(Written::GetReply {
+            id: 4,
+            errno: uhid::EIO,
+            ..
+        })
+    ));
+    c.release_lease(&lease).unwrap();
+    assert_eq!(mouse.query(5, &battery())[0], 2);
+}
+
+#[test]
+fn driver_swapped_for_virtual() {
+    let rig = Rig::new();
+    let mouse = rig.device(0x00cd);
+    assert!(mouse.phys().starts_with("hyperflux-next/native/v1/"));
+    // The module goes, which unbinds the device, and OpenRazer's comes.
+    virtual_drivers(rig.or.sys.path());
+    rig.module_uevent();
+    mouse.send(&uhid::kernel_stop());
+    assert_eq!(mouse.recv(3000), Some(Written::Destroy));
+    let again = rig.device(0x00cd);
+    assert!(again.phys().starts_with("openrazer-virtual/v1/"));
+    assert_eq!(again.query(1, &battery())[0], 2);
+}
+
+#[test]
+fn driver_battery_replaces_ours() {
+    let rig = Rig::new();
+    let mouse = rig.device(0x00cd);
+    common::wait_for(10, || rig.h.shown(0, Lane::Pointer).is_some());
+    // OpenRazer's driver registers a power supply for the device it bound.
+    let bound = rig.drivers().join("razermouse/0006:1532:00CD.0001");
+    std::fs::create_dir_all(bound.join("power_supply/razer-battery")).unwrap();
+    std::fs::write(bound.join("uevent"), format!("HID_PHYS={}\n", mouse.phys())).unwrap();
+    rig.power_supply_uevent();
+    common::wait_for(10, || rig.h.shown(0, Lane::Pointer).is_none());
+    // The keyboard's stays: the driver made none for it.
+    assert!(rig.h.shown(0, Lane::Keyboard).is_some());
+    std::fs::remove_dir_all(bound.join("power_supply")).unwrap();
+    rig.power_supply_uevent();
+    common::wait_for(10, || rig.h.shown(0, Lane::Pointer).is_some());
+}
+
+#[test]
+fn no_driver_no_device() {
+    let rig = Rig::with(Options {
+        sysfs: Some(|sys: &Path| {
+            for driver in ["razermouse", "razerkbd"] {
+                let params = sys.join("module").join(driver).join("parameters");
+                std::fs::remove_file(params.join("hyperflux_native_transport")).unwrap();
+                // A prefix from a later version is no promise about this one.
+                std::fs::write(params.join("virtual_phys"), "openrazer-virtual/v2/\n").unwrap();
+            }
+        }),
+        ..Options::default()
+    });
+    let mut c = rig.h.client(&[]);
+    common::until(&mut c, 5, |s| {
+        common::device(s, 0, Lane::Pointer)
+            .and_then(|d| d.openrazer.as_ref())
+            .and_then(|o| o.reason.as_ref())
+            .is_some_and(|r| r.as_str().contains("OpenRazer driver"))
+    });
+    assert!(rig.or.devices.try_recv().is_err());
 }
 
 #[test]

@@ -723,6 +723,40 @@ fn openrazer_modules() {
 }
 
 #[test]
+fn virtual_device_driver() {
+    let machine = Machine::with_full();
+    // OpenRazer's virtual devices in place of our patch: a parameter,
+    // which modinfo lists without its value, and no tag.
+    for module in ["razerkbd", "razermouse"] {
+        let runner = &machine.runner;
+        runner.answer(
+            &format!("modinfo -F hyperflux_native_transport {module}"),
+            "",
+        );
+        runner.answer(
+            &format!("modinfo -F parm {module}"),
+            "virtual_phys:Phys prefix of the virtual devices this driver takes",
+        );
+        let parameters = format!("/sys/module/{module}/parameters");
+        machine
+            .tree
+            .remove(&format!("{parameters}/hyperflux_native_transport"));
+        machine.tree.file(
+            &format!("{parameters}/virtual_phys"),
+            "openrazer-virtual/v1/\n",
+        );
+    }
+    assert!(machine.codes().is_empty(), "{:?}", machine.codes());
+    // A prefix from a later version, loaded, is no promise about this one.
+    let loaded = "/sys/module/razerkbd/parameters/virtual_phys";
+    machine.tree.file(loaded, "openrazer-virtual/v2/\n");
+    assert_eq!(machine.codes(), ["HFX-401"]);
+    machine.tree.file(loaded, "openrazer-virtual/v1/\n");
+    machine.runner.answer("modinfo -F parm razermouse", "");
+    assert_eq!(machine.codes(), ["HFX-402"]);
+}
+
+#[test]
 fn full_version_mismatch() {
     let machine = Machine::with_full();
     machine

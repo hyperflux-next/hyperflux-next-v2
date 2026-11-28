@@ -142,7 +142,7 @@ To turn the links back on, remove that file and reboot.
 - Charging is tested on the Basilisk V3 Pro 35K and the DeathStalker V2
   Pro TKL. The checked devices are asked the same question OpenRazer
   asks, but not tested through the receiver. That includes the Naga V3
-  Pro and the BlackWidow V4 Low-Profile TKL HyperSpeed. OpenRazer 3.12.4
+  Pro and the BlackWidow V4 Low-Profile TKL HyperSpeed. OpenRazer 3.12.5
   and OpenRGB 1.1 don't ask those two, though owners' captures show
   both answering on their own dongles
   ([hardware](hardware.md#the-checked-devices)).

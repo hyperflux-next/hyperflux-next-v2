@@ -28,7 +28,7 @@ Serials are short and follow a pattern, so trying candidates against the
 hash would find one. The hash keeps the serial out of plain sight; it
 doesn't make it secret.
 
-Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1)
+Applies to OpenRazer 3.12.5 (f7626d0003e03a43f7ea8b449140c81426dc3eb2)
 after 0001 and 0002.
 
 diff --git a/driver/razercommon.c b/driver/razercommon.c
@@ -122,7 +122,7 @@ index 82b58e6..1f07618 100644
 +    return sysfs_emit(buf, "%s", hash->hex);
 +}
 diff --git a/driver/razercommon.h b/driver/razercommon.h
-index 0d47cf0..374b954 100644
+index c11f7fd..e9a3f0b 100644
 --- a/driver/razercommon.h
 +++ b/driver/razercommon.h
 @@ -8,6 +8,7 @@
@@ -131,7 +131,7 @@ index 0d47cf0..374b954 100644
  #include <linux/usb/input.h>
 +#include <crypto/sha2.h>
  
- #define DRIVER_VERSION "3.12.4"
+ #define DRIVER_VERSION "3.12.5"
  #define DRIVER_LICENSE "GPL v2"
 @@ -181,6 +182,16 @@ void print_erroneous_report(struct razer_report* report, char* driver_name, char
  bool razer_can_bind(struct hid_device *hdev);
@@ -151,10 +151,10 @@ index 0d47cf0..374b954 100644
  unsigned char clamp_u8(unsigned char value, unsigned char min, unsigned char max);
  unsigned short clamp_u16(unsigned short value, unsigned short min, unsigned short max);
 diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
-index 9d256ea..3c58010 100644
+index fd8bf0c..f7b55c5 100644
 --- a/driver/razerkbd_driver.c
 +++ b/driver/razerkbd_driver.c
-@@ -2086,6 +2086,18 @@ exit:
+@@ -2071,6 +2071,18 @@ exit:
      return sprintf(buf, "%s\n", &serial_string[0]);
  }
  
@@ -173,7 +173,7 @@ index 9d256ea..3c58010 100644
  /**
   * Read device file "firmware_version"
   *
-@@ -4510,6 +4522,7 @@ static DEVICE_ATTR(keyswitch_optimization,  0660, razer_attr_read_keyswitch_opti
+@@ -4495,6 +4507,7 @@ static DEVICE_ATTR(keyswitch_optimization,  0660, razer_attr_read_keyswitch_opti
  static DEVICE_ATTR(device_type,             0440, razer_attr_read_device_type,                NULL);
  static DEVICE_ATTR(device_mode,             0660, razer_attr_read_device_mode,                razer_attr_write_device_mode);
  static DEVICE_ATTR(device_serial,           0440, razer_attr_read_device_serial,              NULL);
@@ -181,7 +181,7 @@ index 9d256ea..3c58010 100644
  
  static DEVICE_ATTR(matrix_effect_none,      0220, NULL,                                       razer_attr_write_matrix_effect_none);
  static DEVICE_ATTR(matrix_effect_wave,      0220, NULL,                                       razer_attr_write_matrix_effect_wave);
-@@ -5055,6 +5068,9 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+@@ -5040,6 +5053,9 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_serial);                         // Get serial number
@@ -191,7 +191,7 @@ index 9d256ea..3c58010 100644
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_brightness);                     // Gets and sets the brightness
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_test);                                  // Test mode
          CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_type);                           // Get string of device type
-@@ -5599,6 +5615,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+@@ -5584,6 +5600,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
          device_remove_file(&hdev->dev, &dev_attr_version);
          device_remove_file(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
          device_remove_file(&hdev->dev, &dev_attr_device_serial);                         // Get serial number
