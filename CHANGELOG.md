@@ -2,6 +2,38 @@
 
 Each section is also the release's notes on GitHub.
 
+## 1.0.8
+
+Reboot after updating Full. The OpenRazer driver moves to 3.12.5, and the
+old one stays loaded until the reboot, so Doctor reports HFX-401 until
+then. Core has no driver and needs no reboot.
+
+### Added
+
+- The bridge and Doctor work with OpenRazer's own driver once it takes
+  virtual devices.
+- When that driver shows a device's battery, the bridge stops showing its
+  own.
+
+### Changed
+
+- The OpenRazer driver is 3.12.5, with the same HyperFlux Next V2 patches.
+- Debian's and Ubuntu's openrazer-daemon 3.12.4 still installs next to it.
+
+### Fixed
+
+- install.sh on Fedora Atomic and Bazzite waits for a system update that
+  is running.
+- With an update waiting for a reboot, install.sh layers Core onto it and
+  says to run it again after the reboot.
+
+### Signing key
+
+Same key as 1.0.0:
+
+- primary: `2068 74CA DD1B 64B3 2483  E2A8 5FC5 921D E97A F7AA`
+- signing subkey: `69F3 5BC0 4765 FB65 A86C  D4C9 3E3C 3891 CB26 21D9`
+
 ## 1.0.7
 
 Reboot after updating. This release changes the OpenRazer driver, and the
