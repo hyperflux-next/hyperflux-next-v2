@@ -4,28 +4,28 @@ Hash: SHA512
 Architectures: amd64
 Codename: stonking
 Components: main
-Date: Wed, 25 Nov 2026 23:55:04 +0000
+Date: Sat, 28 Nov 2026 15:49:10 +0000
 Description: HyperFlux Next V2 packages for Ubuntu
 Label: HyperFlux Next V2
 Origin: HyperFlux Next V2
 Suite: stonking
 MD5Sum:
- 8b29fef86464ab36b5d5593e9a74032d            11531 main/binary-amd64/Packages
- 3e50ff424bff48ba72a35fa26be0e1e7             2911 main/binary-amd64/Packages.gz
+ 158b0148fe72163ee43c698b83482a44            11532 main/binary-amd64/Packages
+ 87726db8d3bfba66f20fbe784c0b1d2d             2924 main/binary-amd64/Packages.gz
 SHA1:
- 38c14c823300afd116540e2abb4a3e3bfdadae7e            11531 main/binary-amd64/Packages
- fe64c74d87a2bf1c60864394d08b56c51e67e49a             2911 main/binary-amd64/Packages.gz
+ eb88030a602bd86a35681eecd8786d203832006f            11532 main/binary-amd64/Packages
+ 555ef2515f3b47b7f23475eeed8722f8490f1564             2924 main/binary-amd64/Packages.gz
 SHA256:
- 38e7984ef0fb838b394201911f882359d7f3abe68a8463b88da9cf969707ac6c            11531 main/binary-amd64/Packages
- ffdb3132bdc8e6648426dea40ceeb1552d19a6e09d1cb5c1cceae4ef3be708fa             2911 main/binary-amd64/Packages.gz
+ 5256908a18907f7c6d2d140598c8ab7ba8f948a2bb62648452f6ac283733bcf5            11532 main/binary-amd64/Packages
+ 1a67105c520e6220e26c2c9e2fa7feee0397bdbf5c654cd21b7b5d33a0304feb             2924 main/binary-amd64/Packages.gz
 SHA512:
- 7b3e65469296c6ec4bb5d5f9226d7baa57225f098f1378eb73e7cfaeec9ebf28359b9bc68fbccfba688ce8a2842dea99dbb049fc89cea3b2a122e17067d080e9            11531 main/binary-amd64/Packages
- 0659002268533b3448d079d173132b4c2348219d7a16f21eb7212739b794fea86f10eaa6066178d789aaf44ed10b6045e310c0e1c46c564cf72626b5e3891416             2911 main/binary-amd64/Packages.gz
+ e48aaeb5967e84eaf6f3f8114efb96d848ed2e671a1c453067f4316f33d5ab2bc7e4cb41ac668a76a82cc435d3e8214df2b59fd3889609805267cfa86c2f8e60            11532 main/binary-amd64/Packages
+ 59a8ed50c3f68c5d9a9f34c71b0d8344c29136c205a278b23c416eb9d3b2454257ee16b3d6c66842b111ac8004e4254ea9351557b297d6704467f7efcf6c4222             2924 main/binary-amd64/Packages.gz
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEARYKAB0WIQRp81vAR2X7Zahs1Mk+PDiRyyYh2QUCawd2wgAKCRA+PDiRyyYh
-2Zn8AQDEFyTvfBo2BbMsDQYrhgzFlqW7venLuonzOxULpfLy7gEAuv5XEicoejq8
-ArPNhZXsN2WsQnuRKBnkdGtgvCXc8QI=
-=x/qm
+iHUEARYKAB0WIQRp81vAR2X7Zahs1Mk+PDiRyyYh2QUCawr5IAAKCRA+PDiRyyYh
+2VDAAP4iFhs3AsVRQw+vsPlMxxPXMJDt/vx1rAsB++u4hf2v7gEAguaN/5ag58ot
++uMy6wgpEJnDe9/XIs568nAG/Whq1AU=
+=73UX
 -----END PGP SIGNATURE-----
