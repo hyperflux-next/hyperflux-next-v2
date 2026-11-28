@@ -27,7 +27,9 @@ use hfx_proto::errors::{ErrorCode, Severity, render};
 use hfx_proto::messages::{
     DeviceInfo, DeviceKind, Inventory, OpenRazerState, Presence, ReceiverInfo, Snapshot,
 };
-use hfx_proto::openrazer::{CAPABILITY_NAME, CAPABILITY_VALUE, MODULES, PATCHED_MODULES};
+use hfx_proto::openrazer::{
+    CAPABILITY_NAME, CAPABILITY_VALUE, MODULES, PATCHED_MODULES, VIRTUAL_PARAM, VIRTUAL_PHYS_PREFIX,
+};
 use hfx_proto::{PRODUCT_VERSION, paths};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -734,8 +736,17 @@ fn module(system: &System, name: &'static str) -> Module {
     let loaded = system
         .is_dir(&dir)
         .then(|| identity(system.read(&format!("{dir}/srcversion"))));
+    // The 3.12.4 patch has a tag and a parameter. OpenRazer's virtual
+    // devices have the parameter alone, which modinfo lists without its value.
     let tag = system.run(&format!("modinfo -F {CAPABILITY_NAME} {name}"));
-    let parameter = system.read(&format!("{dir}/parameters/{CAPABILITY_NAME}"));
+    let parms = system
+        .run(&format!("modinfo -F parm {name}"))
+        .unwrap_or_default();
+    let takes_virtual = parms
+        .lines()
+        .any(|l| l.starts_with(&format!("{VIRTUAL_PARAM}:")));
+    let native = system.read(&format!("{dir}/parameters/{CAPABILITY_NAME}"));
+    let virtual_ = system.read(&format!("{dir}/parameters/{VIRTUAL_PARAM}"));
     let installed = identity(system.run(&format!("modinfo -F srcversion {name}")));
     Module {
         name,
@@ -745,9 +756,11 @@ fn module(system: &System, name: &'static str) -> Module {
             Vec::new()
         },
         installed,
-        capability: patched.then(|| tag.as_deref() == Some(CAPABILITY_VALUE)),
-        capability_loaded: (patched && loaded.is_some())
-            .then(|| parameter.as_deref() == Some(CAPABILITY_VALUE)),
+        capability: patched.then(|| tag.as_deref() == Some(CAPABILITY_VALUE) || takes_virtual),
+        capability_loaded: (patched && loaded.is_some()).then(|| {
+            native.as_deref() == Some(CAPABILITY_VALUE)
+                || virtual_.as_deref() == Some(VIRTUAL_PHYS_PREFIX)
+        }),
         loaded,
         secure_boot_blocked: false,
     }
