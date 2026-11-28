@@ -229,16 +229,24 @@ def test_openrazer_modules_load():
     assert lines == CATALOG["openrazer"]["modules"] + ["uhid"]
 
 
-def test_openrazer_patch_constants():
-    patches = sorted((ROOT / "integrations/openrazer/patches").glob("*.patch"))
+@pytest.mark.parametrize(
+    "series,constants",
+    [
+        ("patches", ("PHYS_PREFIX", "CAPABILITY_NAME", "CAPABILITY_VALUE")),
+        ("next/patches", ("VIRTUAL_PHYS_PREFIX", "VIRTUAL_PARAM")),
+    ],
+)
+def test_openrazer_patch_constants(series, constants):
+    patches = sorted((ROOT / "integrations/openrazer" / series).glob("*.patch"))
     if not patches:
         pytest.skip("no OpenRazer patch")
     text = "\n".join(p.read_text() for p in patches)
     source = RUST_OPENRAZER.read_text()
-    for constant in ("PHYS_PREFIX", "CAPABILITY_NAME", "CAPABILITY_VALUE"):
+    for constant in constants:
         value = re.search(rf'pub const {constant}: &str = "([^"]+)";', source).group(1)
         assert value in text, constant
-    assert "HFXNERR1" in text
+    # Only the 3.12.4 patch reads the envelope.
+    assert ("HFXNERR1" in text) == (series == "patches")
     descriptor = re.search(r"pub const DESCRIPTOR: \[u8; 19\] = \[(.*?)\];", source, re.S).group(1)
     # Comments like "// Usage Page (0xff00)" would otherwise add bytes.
     descriptor = re.sub(r"//[^\n]*", "", descriptor)

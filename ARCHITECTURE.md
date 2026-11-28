@@ -288,9 +288,10 @@ openrazer-daemon (user) --sysfs--> razerkbd/razermouse (patched)
 The keeper reads the SET from `/dev/uhid` and hands it to the bridge, which
 runs the exchange itself. Because the bridge acknowledges the SET first,
 OpenRazer's GET is already waiting when the response arrives, and the bridge
-answers it with the matched response or an error envelope. The keeper passes
-both to the kernel. The cost is one socket hop each way, about 0.3 ms per
-exchange on the simulator (section 6).
+answers it with the matched response or an error envelope (for OpenRazer's
+virtual devices, a failed GET). The keeper passes both to the kernel. The
+cost is one socket hop each way, about 0.3 ms per exchange on the simulator
+(section 6).
 
 ### Lighting through OpenRGB (the plugin package)
 
@@ -339,6 +340,19 @@ its sandbox and gets a read-only module parameter instead:
 `/sys/module/<module>/parameters/hyperflux_native_transport`. The Python
 test checks that the patch contains these values.
 
+The second contract is OpenRazer's own virtual devices.
+`integrations/openrazer/next/` carries them as a patch for OpenRazer master,
+the one proposed to OpenRazer, until a release has them. The device is the
+same, under the `openrazer-virtual/v1/` prefix. There's no envelope: the
+bridge fails the GET, and the driver returns `EIO` without asking again.
+The loaded module shows the prefix in the read-only parameter
+`virtual_phys`, and `modinfo -F parm` lists that parameter without its
+value, which is what Doctor checks in the installed file. The bridge reads
+both parameters of each module and makes each device for the contract its
+driver has (`Contract` in `openrazer.rs`). A template for the 3.12.4 patch
+goes to the keeper exactly as before the field existed, so a keeper and a
+bridge from either side of an update still agree.
+
 The virtual device (UHID_CREATE2):
 
 | Field | Value |
@@ -380,7 +394,9 @@ Missing files are skipped.
   four OpenRazer modules in catalog order, then `uhid`, one per line.
 - `integrations/openrazer/patches/*.patch`: contains the phys prefix, the
   capability name and value, `HFXNERR1`, and the descriptor bytes as `0x..`
-  literals in order.
+  literals in order. `integrations/openrazer/next/patches/*.patch` has the
+  `openrazer-virtual/v1/` prefix, `virtual_phys` and the same bytes, and no
+  `HFXNERR1`.
 
 Each device's command list holds every command (class, id, data sizes) that
 OpenRazer 3.12.4 or OpenRGB 1.1 sends it, including the queries OpenRGB
@@ -1131,7 +1147,7 @@ Line budgets per part:
 
 | Part | Budget |
 | --- | --- |
-| hfx-bridge | 16,500 |
+| hfx-bridge | 17,000 |
 | hyperfluxctl | 9,000 |
 | OpenRGB plugin + C++ SDK | 6,000 |
 | hfx-proto | 5,000 |

@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 //! The contract between the bridge's virtual OpenRazer devices and the
-//! patched OpenRazer kernel drivers (integrations/openrazer/).
+//! OpenRazer kernel drivers. There are two, told apart by a read-only
+//! module parameter ([`Contract`]): this project's patch for OpenRazer
+//! 3.12.4 (integrations/openrazer/), and OpenRazer's virtual devices, which
+//! integrations/openrazer/next/ carries until OpenRazer has them.
 //!
-//! The patch trusts a HID device as a HyperFlux route only if all of this
-//! holds: bus BUS_VIRTUAL, vendor 0x1532, phys starting with [`PHYS_PREFIX`]
-//! followed by a non-empty `[a-z0-9-]` label, a report descriptor equal to
-//! [`DESCRIPTOR`], and a product id already in the driver's own USB table.
+//! Either driver trusts a HID device as a route only if all of this holds:
+//! bus BUS_VIRTUAL, vendor 0x1532, phys starting with the contract's
+//! prefix followed by a non-empty `[a-z0-9-]` label, a report descriptor
+//! equal to [`DESCRIPTOR`], and a product id already in the driver's own
+//! USB table.
 //! Only root and the hyperflux-keeper group can open /dev/uhid, and the
 //! keeper is the group's sole member, so the keeper alone can create such
 //! a device. A uaccess ACL on /dev/uhid gets around that (ARCHITECTURE.md,
@@ -20,8 +24,44 @@ use crate::report::{REPORT_LEN, Report};
 pub const BUS_VIRTUAL: u16 = 0x06;
 pub const UHID_VERSION: u32 = 0x0100;
 pub const PHYS_PREFIX: &str = "hyperflux-next/native/v1/";
+/// OpenRazer's prefix, which its drivers also show in the parameter
+/// [`VIRTUAL_PARAM`].
+pub const VIRTUAL_PHYS_PREFIX: &str = "openrazer-virtual/v1/";
+pub const VIRTUAL_PARAM: &str = "virtual_phys";
 /// Longest label after the prefix (phys is a 64-byte field with a NUL).
 pub const MAX_LABEL_LEN: usize = 24;
+
+/// Which driver a virtual device is made for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Contract {
+    /// The patch for 3.12.4. It reads [`envelope`] replies as errnos.
+    #[default]
+    Native,
+    /// OpenRazer's virtual devices. A GET with no response fails, and the
+    /// driver returns EIO without asking again.
+    Virtual,
+}
+
+impl Contract {
+    #[must_use]
+    pub fn phys_prefix(self) -> &'static str {
+        match self {
+            Self::Native => PHYS_PREFIX,
+            Self::Virtual => VIRTUAL_PHYS_PREFIX,
+        }
+    }
+
+    /// The parameter a loaded module shows, and the value it reads back
+    /// (without the newline).
+    #[must_use]
+    pub fn parameter(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Native => (CAPABILITY_NAME, CAPABILITY_VALUE),
+            Self::Virtual => (VIRTUAL_PARAM, VIRTUAL_PHYS_PREFIX),
+        }
+    }
+}
 
 /// Vendor page 0xff00, one 90-byte feature report without a report id, no
 /// input or output items, so hid-input creates no input node for it.
@@ -47,7 +87,7 @@ pub const CAPABILITY_VALUE: &str = "razer-feature-report-v1";
 /// OpenRazer's kernel modules, loaded at boot by the Full package so they
 /// are bound before the first virtual device appears.
 pub const MODULES: &[&str] = &["razeraccessory", "razerkbd", "razerkraken", "razermouse"];
-/// The modules that carry the capability parameter.
+/// The modules that take virtual devices, and carry either parameter.
 pub const PATCHED_MODULES: &[&str] = &["razerkbd", "razermouse"];
 
 /// What the bridge answers a GET with when it has no device response to
@@ -128,6 +168,8 @@ mod tests {
         assert!(!label_ok(""));
         assert!(!label_ok("Native-1"));
         assert!(!label_ok(&"a".repeat(25)));
-        assert!(PHYS_PREFIX.len() + MAX_LABEL_LEN < 64);
+        for contract in [Contract::Native, Contract::Virtual] {
+            assert!(contract.phys_prefix().len() + MAX_LABEL_LEN < 64);
+        }
     }
 }

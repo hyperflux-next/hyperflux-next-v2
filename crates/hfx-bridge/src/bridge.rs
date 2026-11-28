@@ -33,6 +33,7 @@ use hfx_proto::messages::{
     Bench, BenchSample, CaptureKind, CaptureLane, CaptureSource, Exchanges, Lane, Presence,
     ReceiverInfo, Route, RouteAccess, Transact,
 };
+use hfx_proto::openrazer::Contract;
 use hfx_proto::report::{self, Report};
 use rustix::fd::{AsFd, OwnedFd};
 use sha2::{Digest, Sha256};
@@ -75,7 +76,8 @@ const SLOTS_AGAIN_MS: u64 = 3_000;
 pub(crate) struct OpenRazer {
     pub env: OpenRazerEnv,
     pub uhid_ok: bool,
-    pub capable: BTreeMap<&'static str, bool>,
+    /// Which virtual devices each loaded driver takes.
+    pub capable: BTreeMap<&'static str, Option<Contract>>,
     pub prints: crate::sysfs::Prints,
 }
 
@@ -1281,16 +1283,14 @@ impl Bridge {
             return;
         };
         for driver in hfx_proto::openrazer::PATCHED_MODULES {
-            let capable = o.env.capable(driver);
-            if o.capable.insert(driver, capable) != Some(capable) {
-                eprintln!(
-                    "{driver}: {}",
-                    if capable {
-                        "HyperFlux Next V2 build loaded"
-                    } else {
-                        "not loaded or not the HyperFlux Next V2 build"
-                    }
-                );
+            let contract = o.env.contract(driver);
+            if o.capable.insert(driver, contract) != Some(contract) {
+                let what = match contract {
+                    Some(Contract::Native) => "HyperFlux Next V2 build loaded",
+                    Some(Contract::Virtual) => "loaded, and it takes OpenRazer's virtual devices",
+                    None => "not loaded, or a build that takes no virtual devices",
+                };
+                eprintln!("{driver}: {what}");
             }
         }
     }
@@ -1364,7 +1364,7 @@ impl Bridge {
                 Some("the device keeper isn't connected")
             } else if drivers
                 .as_ref()
-                .is_some_and(|(uhid, c)| !uhid || c.get(driver) != Some(&true))
+                .is_some_and(|(uhid, c)| !uhid || c.get(driver).copied().flatten().is_none())
             {
                 Some("the patched OpenRazer driver or /dev/uhid isn't there")
             } else {
@@ -1497,9 +1497,13 @@ impl Bridge {
         let now = self.now;
         let id = self.id();
         let label = v.label.clone();
+        let capable = self.openrazer.as_ref().map(|o| &o.capable);
+        let contract = capable.and_then(|c| c.get(v.driver()).copied().flatten());
+        v.contract = contract.unwrap_or_default();
         let template = Template::OpenRazer {
             product_id: pid,
             label,
+            contract: v.contract,
         };
         self.keeper.send(&ToKeeper::Create {
             device: id,
@@ -1511,7 +1515,7 @@ impl Bridge {
         }
         eprintln!("openrazer {}: created {}", v.who, v.phys());
         v.published(print);
-        v.phase = Phase::Live(Box::new(Live::new(id, now)));
+        v.phase = Phase::Live(Box::new(Live::new(id, v.contract, now)));
     }
 
     /// A HID device came or went. A wired device of a paired model takes

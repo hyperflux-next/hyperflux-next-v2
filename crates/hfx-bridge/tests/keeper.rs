@@ -189,6 +189,25 @@ fn bad_templates_refused() {
 }
 
 #[test]
+fn virtual_contract() {
+    let mut k = Alone::start();
+    // OpenRazer's virtual devices take another prefix, for the same label.
+    let with = |device, contract: &str| {
+        create(device, 0x00cd, LABEL)
+            .replace(r#""label""#, &format!(r#""contract":"{contract}","label""#))
+    };
+    k.send_text(&with(1, "virtual"));
+    let (create, _fd) = k.devices.recv_timeout(Duration::from_secs(2)).unwrap();
+    let Some(Written::Create { phys, .. }) = uhid::decode_written(&create) else {
+        panic!("no CREATE2")
+    };
+    assert_eq!(phys, format!("openrazer-virtual/v1/{LABEL}"));
+    // A contract the keeper doesn't know doesn't parse.
+    k.send_text(&with(2, "usb"));
+    k.reconnected();
+}
+
+#[test]
 fn stray_messages_refused() {
     let mut k = Alone::start();
     let kernel = k.openrazer(1);
