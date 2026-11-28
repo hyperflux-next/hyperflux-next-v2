@@ -1,0 +1,621 @@
+Let razerkbd and razermouse drive virtual devices
+
+Some Razer devices can only be reached through something else, such as a
+receiver that several devices share (OpenRazer issue 1892, and the
+HyperFlux V2 receiver, 1532:00CF). This lets a program that knows such a
+receiver present each device behind it as a uhid device, which razerkbd
+and razermouse then drive with the code they have for its model. The
+daemon, Polychromatic and the Python library see an ordinary device, and
+the drivers gain no receiver code and no new ids.
+
+A virtual device is bound only if it is on BUS_VIRTUAL with Razer's
+vendor id, its phys is "openrazer-virtual/v1/" followed by lower-case
+letters, digits and '-', its report descriptor is exactly the one in
+razercommon.c (one 90-byte feature report, no input reports), and its
+product id is one the driver lists for USB. Each report goes to it as a
+feature SET_REPORT and then a feature GET_REPORT, report 0, with the 90
+bytes as they are. The program answers the GET with the device's
+response, or fails it. A failed GET is final: the driver neither asks
+again nor logs it, since the program has tried what it could and says
+why itself.
+
+With no input reports, the event, raw event and input code never runs
+for a virtual device. The other USB-only parts are skipped: razerkbd's
+key state per USB device, autosuspend, the device mode razerkbd sets at
+bind (the program puts its device in the mode it needs), and the
+DeathAdder 3.5G's own reports, which get -ENODEV. Whether a device is on
+USB is asked with hid_is_usb(), so a uhid device that says BUS_USB isn't
+taken for one.
+
+razerkbd and razermouse show the prefix in the read-only parameter
+virtual_phys, for a program to check before it creates a device. Setting
+it is refused. 99-razer.rules gets two bind rules for virtual devices,
+because the existing rules match on USB attributes.
+
+This is the patch proposed to OpenRazer. HyperFlux Next V2 carries it
+until a release has it.
+
+Applies to OpenRazer master (f5d547093d30fb2efa9c57469a1a30a0a1a279a5).
+
+diff --git a/driver/razercommon.c b/driver/razercommon.c
+index fd6e828..ee6449d 100644
+--- a/driver/razercommon.c
++++ b/driver/razercommon.c
+@@ -9,9 +9,141 @@
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/hid.h>
++#include <linux/ctype.h>
+ 
+ #include "razercommon.h"
+ 
++/*
++ * Virtual devices
++ *
++ * A program that reaches a Razer device by some other way than its own USB
++ * interface, for example through a receiver that several devices share, can
++ * present it as a uhid device. razerkbd and razermouse bind such a device and
++ * send it the same 90-byte reports they send over USB: each one as a feature
++ * SET_REPORT followed by a feature GET_REPORT, report number 0, with the 90
++ * bytes as they are. The program answers the GET with the device's response,
++ * or fails it.
++ *
++ * Only whoever can write /dev/uhid can create such a device, by default root.
++ * The checks below don't make a device trustworthy. They keep the drivers to
++ * devices that were made for them: on the virtual bus, with Razer's vendor id,
++ * this phys prefix and exactly this report descriptor, and with a product id
++ * the driver already lists for USB. The descriptor has one feature report and
++ * no input reports, so the drivers' event and input code, which expects a USB
++ * device, never runs for a virtual device.
++ */
++#define RAZER_VIRTUAL_PHYS_PREFIX "openrazer-virtual/v1/"
++
++static const u8 razer_virtual_rdesc[] = {
++    0x06, 0x00, 0xff,   /* Usage Page (Vendor Defined 0xff00) */
++    0x09, 0x01,         /* Usage (1) */
++    0xa1, 0x01,         /* Collection (Application) */
++    0x15, 0x00,         /*   Logical Minimum (0) */
++    0x26, 0xff, 0x00,   /*   Logical Maximum (255) */
++    0x75, 0x08,         /*   Report Size (8) */
++    0x95, 0x5a,         /*   Report Count (90) */
++    0xb1, 0x02,         /*   Feature (Data, Var, Abs) */
++    0xc0,               /* End Collection */
++};
++
++static bool razer_is_virtual_device(struct hid_device *hdev)
++{
++    size_t prefix_len = strlen(RAZER_VIRTUAL_PHYS_PREFIX);
++    const char *label = hdev->phys + prefix_len;
++
++    if (hdev->bus != BUS_VIRTUAL || hdev->vendor != USB_VENDOR_ID_RAZER ||
++        strncmp(hdev->phys, RAZER_VIRTUAL_PHYS_PREFIX, prefix_len) ||
++        hdev->dev_rsize != sizeof(razer_virtual_rdesc) ||
++        memcmp(hdev->dev_rdesc, razer_virtual_rdesc, sizeof(razer_virtual_rdesc)))
++        return false;
++
++    /* The rest of phys names the device: lower-case letters, digits and '-' */
++    if (!*label)
++        return false;
++    for (; *label; label++) {
++        if (!islower(*label) && !isdigit(*label) && *label != '-')
++            return false;
++    }
++    return true;
++}
++
++/**
++ * Whether the driver being probed may take this device
++ *
++ * USB devices are matched by the driver's table as before. A virtual device
++ * has to pass the checks above, and the table matches it with an entry for
++ * any Razer product, so its product id also has to be one the driver lists
++ * for USB. The entry adds a way to reach devices, but no devices.
++ */
++static int razer_virtual_phys_get(char *buf, const struct kernel_param *kp)
++{
++    return scnprintf(buf, PAGE_SIZE, "%s\n", RAZER_VIRTUAL_PHYS_PREFIX);
++}
++
++static int razer_virtual_phys_set(const char *val, const struct kernel_param *kp)
++{
++    return -EPERM;
++}
++
++/*
++ * The parameter virtual_phys of razerkbd and razermouse: the phys prefix of
++ * the virtual devices the loaded module takes, for a program to read from
++ * /sys/module before it creates one. It can't be set.
++ */
++const struct kernel_param_ops razer_virtual_phys_ops = {
++    .get = razer_virtual_phys_get,
++    .set = razer_virtual_phys_set,
++};
++
++bool razer_can_bind(struct hid_device *hdev)
++{
++    const struct hid_device_id *id;
++
++    if (hid_is_usb(hdev))
++        return true;
++    if (!razer_is_virtual_device(hdev))
++        return false;
++    for (id = hdev->driver->id_table; id->bus; id++) {
++        if (id->bus == BUS_USB && id->vendor == hdev->vendor && id->product == hdev->product)
++            return true;
++    }
++    return false;
++}
++
++/**
++ * Send a report to a virtual device and read its response
++ *
++ * There's no wait between the two: the program holds the GET until it has
++ * the response. uhid turns a failed GET into -EIO.
++ */
++static int razer_virtual_exchange(struct hid_device *hdev, const void *request, struct razer_report *response)
++{
++    u8 *buf;
++    int len;
++
++    buf = kmemdup(request, sizeof(struct razer_report), GFP_KERNEL);
++    if (!buf)
++        return -ENOMEM;
++
++    len = hid_hw_raw_request(hdev, 0, buf, sizeof(struct razer_report),
++                             HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
++    if (len == sizeof(struct razer_report)) {
++        memset(buf, 0, sizeof(struct razer_report));
++        len = hid_hw_raw_request(hdev, 0, buf, sizeof(struct razer_report),
++                                 HID_FEATURE_REPORT, HID_REQ_GET_REPORT);
++    }
++    if (len == sizeof(struct razer_report) && response)
++        memcpy(response, buf, sizeof(struct razer_report));
++    kfree(buf);
++
++    /* The program behind the device logs why, so this doesn't */
++    if (len < 0) {
++        hid_dbg(hdev, "Failed to exchange report with virtual device: %d\n", len);
++        return len;
++    }
++    return len == sizeof(struct razer_report) ? 0 : -EIO;
++}
++
+ /**
+  * Send USB control report to the keyboard
+  * USUALLY index = 0x02
+@@ -19,9 +151,18 @@
+  */
+ int razer_send_control_msg(struct hid_device *hdev, const void *data, u16 size, u16 index, ulong wait)
+ {
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
++    struct usb_device *usb_dev;
+     int ret;
+ 
++    // A virtual device answers every report, so read the answer and drop it
++    if (!hid_is_usb(hdev)) {
++        if (size != sizeof(struct razer_report))
++            return -EINVAL;
++        return razer_virtual_exchange(hdev, data, NULL);
++    }
++
++    usb_dev = hid_to_usb_dev(hdev);
++
+     // Send usb control message
+     ret = usb_control_msg_send(usb_dev,
+                                0, // endpoint to send the message to
+@@ -62,13 +203,28 @@ int razer_send_control_msg(struct hid_device *hdev, const void *data, u16 size,
+  */
+ int razer_get_usb_response(struct hid_device *hdev, uint report_index, struct razer_report* request_report, uint response_index, struct razer_report* response_report, ulong wait)
+ {
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
++    struct usb_device *usb_dev;
+     int err;
+ 
+     if (WARN_ON(request_report->transaction_id.id == 0x00)) {
+         request_report->transaction_id.id = 0xFF;
+     }
+ 
++    /*
++     * The program behind a virtual device controls the response, so a bad
++     * data_size is an error here, not a warning.
++     */
++    if (!hid_is_usb(hdev)) {
++        err = razer_virtual_exchange(hdev, request_report, response_report);
++        if (!err && response_report->data_size > ARRAY_SIZE(response_report->arguments)) {
++            response_report->data_size = ARRAY_SIZE(response_report->arguments);
++            err = -EINVAL;
++        }
++        return err;
++    }
++
++    usb_dev = hid_to_usb_dev(hdev);
++
+     // Send the request to the device.
+     err = razer_send_control_msg(hdev, request_report, sizeof(*request_report), report_index, wait);
+     if (err)
+@@ -163,9 +319,15 @@ void print_erroneous_report(struct hid_device *hdev, struct razer_report* report
+ 
+ int razer_send_control_msg_old_device(struct hid_device *hdev, const void *data, uint value, uint index, uint size, ulong wait)
+ {
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
++    struct usb_device *usb_dev;
+     int ret;
+ 
++    // These reports don't fit the virtual device's report
++    if (!hid_is_usb(hdev))
++        return -ENODEV;
++
++    usb_dev = hid_to_usb_dev(hdev);
++
+     // Send usb control message
+     ret = usb_control_msg_send(usb_dev,
+                                0, // endpoint to send the message to
+diff --git a/driver/razercommon.h b/driver/razercommon.h
+index 9407e37..40601ba 100644
+--- a/driver/razercommon.h
++++ b/driver/razercommon.h
+@@ -153,6 +153,8 @@ int razer_send_argb_msg(struct hid_device *hdev, unsigned char channel, size_t s
+ unsigned char razer_calculate_crc(struct razer_report *report);
+ struct razer_report get_razer_report(unsigned char command_class, unsigned char command_id, unsigned char data_size);
+ void print_erroneous_report(struct hid_device *hdev, struct razer_report* report, const char *message);
++bool razer_can_bind(struct hid_device *hdev);
++extern const struct kernel_param_ops razer_virtual_phys_ops;
+ 
+ /* Borrowed from drivers/hid/usbhid/usbhid.h */
+ #define	hid_to_usb_dev(hid_dev) \
+diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
+index c58eec9..75ebf9b 100644
+--- a/driver/razerkbd_driver.c
++++ b/driver/razerkbd_driver.c
+@@ -29,6 +29,9 @@ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE(DRIVER_LICENSE);
+ 
++module_param_cb(virtual_phys, &razer_virtual_phys_ops, NULL, 0444);
++MODULE_PARM_DESC(virtual_phys, "Phys prefix of the virtual devices this driver takes");
++
+ // These are evdev key codes, not HID key codes.
+ // Lower macro key codes are intended for the actual macro keys
+ // Higher macro key codes are inteded for Chroma functions
+@@ -342,9 +345,9 @@ static bool is_blade_laptop(struct razer_kbd_device *device)
+ /**
+  * Get request/response indices and timing parameters for the device
+  */
+-static void razer_get_report_params(struct usb_device *usb_dev, uint *report_index, uint *response_index, ulong *wait)
++static void razer_get_report_params(struct hid_device *hdev, uint *report_index, uint *response_index, ulong *wait)
+ {
+-    switch (usb_dev->descriptor.idProduct) {
++    switch (hdev->product) {
+     case USB_DEVICE_ID_RAZER_HUNTSMAN_V2_TENKEYLESS:
+     case USB_DEVICE_ID_RAZER_HUNTSMAN_V2:
+     case USB_DEVICE_ID_RAZER_HUNTSMAN_V2_ANALOG:
+@@ -418,11 +421,10 @@ static void razer_get_report_params(struct usb_device *usb_dev, uint *report_ind
+  */
+ static int razer_get_report(struct hid_device *hdev, struct razer_report *request, struct razer_report *response)
+ {
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
+     uint report_index, response_index;
+     ulong wait;
+ 
+-    razer_get_report_params(usb_dev, &report_index, &response_index, &wait);
++    razer_get_report_params(hdev, &report_index, &response_index, &wait);
+ 
+     return razer_get_usb_response(hdev, report_index, request, response_index, response, wait);
+ }
+@@ -432,14 +434,13 @@ static int razer_get_report(struct hid_device *hdev, struct razer_report *reques
+  */
+ static int __must_check razer_send_payload_no_response(struct razer_kbd_device *device, struct razer_report *request)
+ {
+-    struct usb_device *usb_dev = hid_to_usb_dev(device->hdev);
+     uint report_index, response_index;
+     ulong wait;
+ 
+     /* Except the caller to have set the transaction_id */
+     WARN_ON(request->transaction_id.id == 0x00);
+ 
+-    razer_get_report_params(usb_dev, &report_index, &response_index, &wait);
++    razer_get_report_params(device->hdev, &report_index, &response_index, &wait);
+ 
+     return razer_send_control_msg(device->hdev, request, sizeof(*request), report_index, wait);
+ }
+@@ -459,6 +460,12 @@ static int __must_check razer_send_payload(struct razer_kbd_device *device, stru
+         err = razer_get_report(device->hdev, request, response);
+         mutex_unlock(&device->lock);
+         if (err) {
++            /*
++             * A virtual device's program has already tried what it could,
++             * and the response holds nothing from the device
++             */
++            if (!hid_is_usb(device->hdev))
++                return err;
+             print_erroneous_report(device->hdev, response, "Invalid Report Length");
+             goto retry;
+         }
+@@ -5532,16 +5539,24 @@ static int razer_kbd_input_mapping(struct hid_device *hdev, struct hid_input *hi
+ 
+ static void razer_kbd_init(struct razer_kbd_device *dev, struct hid_device *hdev)
+ {
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
+-
+     // Initialise mutex
+     mutex_init(&dev->lock);
+     // Setup values
+     dev->hdev = hdev;
+-    dev->usb_vid = usb_dev->descriptor.idVendor;
+-    dev->usb_pid = usb_dev->descriptor.idProduct;
+-    dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
++
++    if (hid_is_usb(hdev)) {
++        struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
++        struct usb_device *usb_dev = hid_to_usb_dev(hdev);
++
++        dev->usb_vid = usb_dev->descriptor.idVendor;
++        dev->usb_pid = usb_dev->descriptor.idProduct;
++        dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
++    } else {
++        // A virtual device stands for the control interface, which gets the attributes
++        dev->usb_vid = hdev->vendor;
++        dev->usb_pid = hdev->product;
++        dev->usb_interface_protocol = USB_INTERFACE_PROTOCOL_MOUSE;
++    }
+ }
+ 
+ /**
+@@ -5549,17 +5564,15 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct hid_device *hdev
+  */
+ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ {
+-    struct usb_interface *intf;
+-    struct usb_device *usb_dev;
++    struct usb_device *usb_dev = NULL;
+     struct razer_kbd_device *dev = NULL;
+     struct razer_kbd_usb_device_data *usb_dev_data = NULL;
+     int err;
+ 
+-    if (!hid_is_usb(hdev))
++    if (!razer_can_bind(hdev))
+         return -ENODEV;
+-
+-    intf = to_usb_interface(hdev->dev.parent);
+-    usb_dev = hid_to_usb_dev(hdev);
++    if (hid_is_usb(hdev))
++        usb_dev = hid_to_usb_dev(hdev);
+ 
+     dev = kzalloc_obj(*dev);
+     if(dev == NULL) {
+@@ -5568,22 +5581,25 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+     }
+ 
+     // Allocate data in context to the usb device if not already done.
+-    usb_dev_data = dev_get_drvdata(&usb_dev->dev);
+-    if (!usb_dev_data) {
+-        usb_dev_data = devm_kzalloc(&usb_dev->dev, sizeof(struct razer_kbd_usb_device_data), GFP_KERNEL);
++    // A virtual device has no key events and needs none.
++    if (usb_dev) {
++        usb_dev_data = dev_get_drvdata(&usb_dev->dev);
+         if (!usb_dev_data) {
+-            err = -ENOMEM;
+-            goto exit_free;
+-        }
++            usb_dev_data = devm_kzalloc(&usb_dev->dev, sizeof(struct razer_kbd_usb_device_data), GFP_KERNEL);
++            if (!usb_dev_data) {
++                err = -ENOMEM;
++                goto exit_free;
++            }
+ 
+-        dev_set_drvdata(&usb_dev->dev, usb_dev_data);
++            dev_set_drvdata(&usb_dev->dev, usb_dev_data);
++        }
+     }
+ 
+     // Init data
+     razer_kbd_init(dev, hdev);
+ 
+     // Other interfaces are actual key-emitting devices
+-    if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_MOUSE) {
++    if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_MOUSE) {
+         // If the currently bound device is the control (mouse) interface
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
+@@ -5594,7 +5610,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
+ 
+-        switch(usb_dev->descriptor.idProduct) {
++        switch(dev->usb_pid) {
+ 
+         case USB_DEVICE_ID_RAZER_NOSTROMO:
+             CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
+@@ -6087,12 +6103,13 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+         // Set device to regular mode, not driver mode
+         // When the daemon discovers the device it will instruct it to enter driver mode
+         // Tartarus Pro resets when it receives this command
+-        if (usb_dev->descriptor.idProduct != USB_DEVICE_ID_RAZER_TARTARUS_PRO) {
++        // A virtual device's program puts its device in the mode it needs
++        if (dev->usb_pid != USB_DEVICE_ID_RAZER_TARTARUS_PRO && usb_dev) {
+             err = razer_set_device_mode(dev, 0x00, 0x00);
+             if (err)
+                 goto exit_free;
+         }
+-    } else if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
++    } else if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_super);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_tab);
+         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_key_alt_f4);
+@@ -6114,7 +6131,7 @@ static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *
+     }
+ 
+     // Leave autosuspend on for laptops
+-    if (!is_blade_laptop(dev)) {
++    if (usb_dev && !is_blade_laptop(dev)) {
+         usb_disable_autosuspend(usb_dev);
+     }
+ 
+@@ -6133,13 +6150,11 @@ exit_free:
+ static void razer_kbd_disconnect(struct hid_device *hdev)
+ {
+     struct razer_kbd_device *dev;
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
+ 
+     dev = hid_get_drvdata(hdev);
+ 
+     // Other interfaces are actual key-emitting devices
+-    if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_MOUSE) {
++    if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_MOUSE) {
+         // If the currently bound device is the control (mouse) interface
+         device_remove_file(&hdev->dev, &dev_attr_version);
+         device_remove_file(&hdev->dev, &dev_attr_firmware_version);                      // Get the firmware version
+@@ -6150,7 +6165,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+         device_remove_file(&hdev->dev, &dev_attr_device_mode);                           // Get device mode
+         device_remove_file(&hdev->dev, &dev_attr_kbd_layout);                            // Gets the physical layout
+ 
+-        switch(usb_dev->descriptor.idProduct) {
++        switch(dev->usb_pid) {
+ 
+         case USB_DEVICE_ID_RAZER_NOSTROMO:
+             device_remove_file(&hdev->dev, &dev_attr_profile_led_red);               // Profile/Macro LED Red
+@@ -6639,7 +6654,7 @@ static void razer_kbd_disconnect(struct hid_device *hdev)
+             device_remove_file(&hdev->dev, &dev_attr_macro_led_effect);              // Change macro LED effect (static, flashing)
+             break;
+         }
+-    } else if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
++    } else if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_KEYBOARD) {
+         device_remove_file(&hdev->dev, &dev_attr_key_super);
+         device_remove_file(&hdev->dev, &dev_attr_key_alt_tab);
+         device_remove_file(&hdev->dev, &dev_attr_key_alt_f4);
+@@ -6802,6 +6817,8 @@ static const struct hid_device_id razer_devices[] = {
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2024) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2025) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_BLADE_18_2026) },
++    // Virtual devices, limited to the products above by razer_can_bind()
++    { HID_DEVICE(BUS_VIRTUAL,HID_GROUP_ANY,USB_VENDOR_ID_RAZER,HID_ANY_ID) },
+     { 0 }
+ };
+ 
+diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
+index 1e3586b..10f4880 100644
+--- a/driver/razermouse_driver.c
++++ b/driver/razermouse_driver.c
+@@ -27,14 +27,16 @@ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE(DRIVER_LICENSE);
+ 
++module_param_cb(virtual_phys, &razer_virtual_phys_ops, NULL, 0444);
++MODULE_PARM_DESC(virtual_phys, "Phys prefix of the virtual devices this driver takes");
++
+ /**
+  * Send report to the mouse
+  */
+ static int razer_get_report(struct hid_device *hdev, struct razer_report *request, struct razer_report *response)
+ {
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
+     unsigned int index = 0;
+-    switch (usb_dev->descriptor.idProduct) {
++    switch (hdev->product) {
+     // These devices require longer waits to read their firmware, serial, and other setting values
+     case USB_DEVICE_ID_RAZER_LANCEHEAD_WIRELESS_RECEIVER:
+     case USB_DEVICE_ID_RAZER_LANCEHEAD_WIRELESS_WIRED:
+@@ -136,6 +138,12 @@ static int __must_check razer_send_payload(struct razer_mouse_device *device, st
+         err = razer_get_report(device->hdev, request, response);
+         mutex_unlock(&device->lock);
+         if (err) {
++            /*
++             * A virtual device's program has already tried what it could,
++             * and the response holds nothing from the device
++             */
++            if (!hid_is_usb(device->hdev))
++                return err;
+             print_erroneous_report(device->hdev, response, "Invalid Report Length");
+             goto retry;
+         }
+@@ -6587,19 +6595,28 @@ static int razer_input_configured(struct hid_device *hdev,
+  */
+ static void razer_mouse_init(struct razer_mouse_device *dev, struct hid_device *hdev)
+ {
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = hid_to_usb_dev(hdev);
+-
+     unsigned int rand_serial = 0;
+ 
+     // Initialise mutex
+     mutex_init(&dev->lock);
+     // Setup values
+     dev->hdev = hdev;
+-    dev->usb_vid = usb_dev->descriptor.idVendor;
+-    dev->usb_pid = usb_dev->descriptor.idProduct;
+-    dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
+-    dev->usb_interface_subclass = intf->cur_altsetting->desc.bInterfaceSubClass;
++
++    if (hid_is_usb(hdev)) {
++        struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
++        struct usb_device *usb_dev = hid_to_usb_dev(hdev);
++
++        dev->usb_vid = usb_dev->descriptor.idVendor;
++        dev->usb_pid = usb_dev->descriptor.idProduct;
++        dev->usb_interface_protocol = intf->cur_altsetting->desc.bInterfaceProtocol;
++        dev->usb_interface_subclass = intf->cur_altsetting->desc.bInterfaceSubClass;
++    } else {
++        // A virtual device stands for the control interface, which gets the attributes
++        dev->usb_vid = hdev->vendor;
++        dev->usb_pid = hdev->product;
++        dev->usb_interface_protocol = USB_INTERFACE_PROTOCOL_MOUSE;
++        dev->usb_interface_subclass = USB_INTERFACE_SUBCLASS_BOOT;
++    }
+ 
+     // Get a "random" integer
+     get_random_bytes(&rand_serial, sizeof(unsigned int));
+@@ -6636,7 +6653,7 @@ static int razer_mouse_probe(struct hid_device *hdev, const struct hid_device_id
+     struct razer_mouse_device *dev = NULL;
+     unsigned char expected_subclass = 0xFF;
+ 
+-    if (!hid_is_usb(hdev))
++    if (!razer_can_bind(hdev))
+         return -ENODEV;
+ 
+     dev = kzalloc_obj(*dev);
+@@ -7807,12 +7824,10 @@ exit_free:
+ static void razer_mouse_disconnect(struct hid_device *hdev)
+ {
+     struct razer_mouse_device *dev;
+-    struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
+-    struct usb_device *usb_dev = interface_to_usbdev(intf);
+ 
+     dev = hid_get_drvdata(hdev);
+ 
+-    if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_MOUSE) {
++    if(dev->usb_interface_protocol == USB_INTERFACE_PROTOCOL_MOUSE) {
+         device_remove_file(&hdev->dev, &dev_attr_version);
+         device_remove_file(&hdev->dev, &dev_attr_test);
+         device_remove_file(&hdev->dev, &dev_attr_firmware_version);
+@@ -7820,7 +7835,7 @@ static void razer_mouse_disconnect(struct hid_device *hdev)
+         device_remove_file(&hdev->dev, &dev_attr_device_serial);
+         device_remove_file(&hdev->dev, &dev_attr_device_mode);
+ 
+-        switch(usb_dev->descriptor.idProduct) {
++        switch(dev->usb_pid) {
+         case USB_DEVICE_ID_RAZER_ABYSSUS_ELITE_DVA_EDITION:
+         case USB_DEVICE_ID_RAZER_ABYSSUS_ESSENTIAL:
+             device_remove_file(&hdev->dev, &dev_attr_poll_rate);
+@@ -9061,6 +9076,8 @@ static const struct hid_device_id razer_devices[] = {
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_VERTICAL_EDITION_WIRED) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_WIRED) },
+     { HID_USB_DEVICE(USB_VENDOR_ID_RAZER,USB_DEVICE_ID_RAZER_PRO_CLICK_V2_WIRELESS) },
++    // Virtual devices, limited to the products above by razer_can_bind()
++    { HID_DEVICE(BUS_VIRTUAL,HID_GROUP_ANY,USB_VENDOR_ID_RAZER,HID_ANY_ID) },
+     { 0 }
+ };
+ 
+diff --git a/install_files/udev/99-razer.rules b/install_files/udev/99-razer.rules
+index b81426d..318adb9 100644
+--- a/install_files/udev/99-razer.rules
++++ b/install_files/udev/99-razer.rules
+@@ -1,3 +1,7 @@
++# Virtual devices (see driver/razercommon.c) have no USB parent, so the rules
++# below never match them. Set their group once the driver has bound them.
++ACTION=="bind", SUBSYSTEM=="hid", KERNEL=="0006:1532:*", ENV{HID_PHYS}=="openrazer-virtual/v1/*", DRIVER=="razerkbd", RUN+="razer_mount razerkbd $kernel"
++ACTION=="bind", SUBSYSTEM=="hid", KERNEL=="0006:1532:*", ENV{HID_PHYS}=="openrazer-virtual/v1/*", DRIVER=="razermouse", RUN+="razer_mount razermouse $kernel"
+ ACTION!="add", GOTO="razer_end"
+ SUBSYSTEMS=="usb|input|hid", ATTRS{idVendor}=="1532", GOTO="razer_vendor"
+ GOTO="razer_end"

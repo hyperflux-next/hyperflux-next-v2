@@ -1,0 +1,95 @@
+Stay quiet about a device that is gone
+
+razerkbd, razermouse and razeraccessory try a failed request five times,
+10 ms apart, and log two lines each time. A device that has been
+unplugged fails every one of them with -ENODEV, so an app that draws on
+it gets about ten kernel lines and 50 ms of waiting for every frame.
+Return -ENODEV at once, and don't log it in the send and receive
+functions either.
+
+Applies to OpenRazer master (f5d547093d30fb2efa9c57469a1a30a0a1a279a5) after 0001 and 0002.
+
+diff --git a/driver/razeraccessory_driver.c b/driver/razeraccessory_driver.c
+index ecb7c6e..24faf76 100644
+--- a/driver/razeraccessory_driver.c
++++ b/driver/razeraccessory_driver.c
+@@ -62,6 +62,9 @@ static int __must_check razer_send_payload(struct razer_accessory_device *device
+         err = razer_get_report(device->hdev, request, response);
+         mutex_unlock(&device->lock);
+         if (err) {
++            /* A device that is gone fails every try, and saying so each time fills the log */
++            if (err == -ENODEV)
++                return err;
+             print_erroneous_report(device->hdev, response, "Invalid Report Length");
+             goto retry;
+         }
+diff --git a/driver/razercommon.c b/driver/razercommon.c
+index 8689d62..8d464a2 100644
+--- a/driver/razercommon.c
++++ b/driver/razercommon.c
+@@ -178,7 +178,8 @@ int razer_send_control_msg(struct hid_device *hdev, const void *data, u16 size,
+     // Wait
+     fsleep(wait);
+ 
+-    if (ret)
++    // A device that is gone fails every request, and the callers return at once
++    if (ret && ret != -ENODEV)
+         hid_warn(hdev, "Failed to send USB control message: %d\n", ret);
+ 
+     return ret;
+@@ -242,7 +243,8 @@ int razer_get_usb_response(struct hid_device *hdev, uint report_index, struct ra
+                                USB_CTRL_SET_TIMEOUT, // time in msecs to wait for the message to complete before timing out
+                                GFP_KERNEL);
+     if (err) {
+-        hid_warn(hdev, "Failed to receive USB control message: %d\n", err);
++        if (err != -ENODEV)
++            hid_warn(hdev, "Failed to receive USB control message: %d\n", err);
+         return err;
+     }
+ 
+@@ -343,7 +345,7 @@ int razer_send_control_msg_old_device(struct hid_device *hdev, const void *data,
+     // Wait
+     fsleep(wait);
+ 
+-    if (ret)
++    if (ret && ret != -ENODEV)
+         hid_warn(hdev, "Failed to send USB control message: %d\n", ret);
+ 
+     return ret;
+@@ -387,7 +389,7 @@ int razer_send_argb_msg(struct hid_device* hdev, unsigned char channel, size_t s
+                                USB_CTRL_SET_TIMEOUT, // time in msecs to wait for the message to complete before timing out
+                                GFP_KERNEL);
+ 
+-    if (ret)
++    if (ret && ret != -ENODEV)
+         hid_warn(hdev, "Failed to send USB control message: %d\n", ret);
+ 
+     return ret;
+diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
+index b6741c1..62657e8 100644
+--- a/driver/razerkbd_driver.c
++++ b/driver/razerkbd_driver.c
+@@ -460,6 +460,9 @@ static int __must_check razer_send_payload(struct razer_kbd_device *device, stru
+         err = razer_get_report(device->hdev, request, response);
+         mutex_unlock(&device->lock);
+         if (err) {
++            /* A device that is gone fails every try, and saying so each time fills the log */
++            if (err == -ENODEV)
++                return err;
+             /*
+              * A virtual device's program has already tried what it could,
+              * and the response holds nothing from the device
+diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
+index 59bde21..8c4b247 100644
+--- a/driver/razermouse_driver.c
++++ b/driver/razermouse_driver.c
+@@ -138,6 +138,9 @@ static int __must_check razer_send_payload(struct razer_mouse_device *device, st
+         err = razer_get_report(device->hdev, request, response);
+         mutex_unlock(&device->lock);
+         if (err) {
++            /* A device that is gone fails every try, and saying so each time fills the log */
++            if (err == -ENODEV)
++                return err;
+             /*
+              * A virtual device's program has already tried what it could,
+              * and the response holds nothing from the device
