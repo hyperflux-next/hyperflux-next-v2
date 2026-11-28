@@ -174,6 +174,9 @@ pub struct Device {
     /// Commands refused for not being in the list (class, id and size):
     /// how often, and when that was last logged.
     pub refused: BTreeMap<[u8; 3], (u32, u64)>,
+    /// OpenRazer's driver shows a battery of its own for the virtual
+    /// device, so the desktop gets none from the bridge.
+    pub driver_battery: bool,
 }
 
 impl Device {
@@ -203,6 +206,7 @@ impl Device {
             learned: crate::wire::Learned::new(devices::first_get_delay_us(pid)),
             firmware: None,
             refused: BTreeMap::new(),
+            driver_battery: false,
         };
         // The pointer's movement says when a mouse may have changed mats.
         let mouse = d.own_lane() && lane == Lane::Pointer;
@@ -437,6 +441,9 @@ impl Device {
     /// What the desktop should show right now.
     #[must_use]
     pub fn desired_record(&self) -> Option<Record> {
+        if self.driver_battery {
+            return None;
+        }
         let level = self.battery.level?;
         Some(Record {
             capacity: level,

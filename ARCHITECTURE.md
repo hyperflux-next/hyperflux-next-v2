@@ -828,6 +828,13 @@ for it again after 1 s, 5 s and 30 s, and with the next reading. Readings
 older than 30 minutes (`hfx_proto::present::BATTERY_STALE_AFTER_MS`) are
 stale in the protocol, but UPower keeps showing them.
 
+OpenRazer's driver shows no battery of its own today. Its pull request 2868
+would add one to each device it drives, the virtual ones included, and the
+desktop would list every battery twice. So on each `hid` or `power_supply`
+uevent the bridge looks for a power supply under each virtual device it
+made, and withdraws its own battery device for that lane while there is
+one.
+
 ### Battery probes
 
 A probe queries 07/80, then 07/84 unless the device's status reports decide

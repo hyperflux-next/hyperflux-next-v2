@@ -1309,6 +1309,45 @@ impl Bridge {
         if events.iter().any(|e| e.subsystem == "hid") {
             self.rescan_twins();
         }
+        if events
+            .iter()
+            .any(|e| e.subsystem == "hid" || e.subsystem == "power_supply")
+        {
+            self.check_driver_batteries();
+        }
+    }
+
+    /// Whether OpenRazer's driver shows a battery for each lane's virtual
+    /// device. It shows none today. One that does (OpenRazer's pull request
+    /// 2868) would put every battery on the desktop twice, so the bridge's
+    /// goes while the driver's is there.
+    fn check_driver_batteries(&mut self) {
+        let Some(o) = self.openrazer.as_ref() else {
+            return;
+        };
+        let drivers = o.env.hid_drivers.clone();
+        for rx in self.receivers.values_mut() {
+            for lane in LANES {
+                let Some(d) = rx.device_mut(lane) else {
+                    continue;
+                };
+                let live = d
+                    .vdev
+                    .as_ref()
+                    .filter(|v| matches!(v.phase, Phase::Live(_)));
+                let found = live
+                    .is_some_and(|v| crate::sysfs::driver_battery(&drivers, v.driver(), &v.phys()));
+                if found != d.driver_battery {
+                    d.driver_battery = found;
+                    let what = if found {
+                        "OpenRazer's driver shows it, so the bridge's is withdrawn"
+                    } else {
+                        "OpenRazer's driver no longer shows it"
+                    };
+                    eprintln!("battery {}/{}: {what}", rx.id, lane_name(lane));
+                }
+            }
+        }
     }
 
     /// The device on a receiver's lane, if it is still the one with `pid`.

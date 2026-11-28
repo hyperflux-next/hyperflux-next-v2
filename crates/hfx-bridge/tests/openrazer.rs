@@ -132,6 +132,12 @@ impl Rig {
         self.or.uevents.send(message.as_bytes()).unwrap();
     }
 
+    /// A power supply came or went.
+    fn power_supply_uevent(&self) {
+        let message = "add@/devices/x/power_supply/y\0ACTION=add\0SUBSYSTEM=power_supply\0";
+        self.or.uevents.send(message.as_bytes()).unwrap();
+    }
+
     /// A driver module was loaded or removed.
     fn module_uevent(&self) {
         let message = "add@/module/razermouse\0ACTION=add\0SUBSYSTEM=module\0";
@@ -424,6 +430,24 @@ fn driver_swapped_for_virtual() {
     let again = rig.device(0x00cd);
     assert!(again.phys().starts_with("openrazer-virtual/v1/"));
     assert_eq!(again.query(1, &battery())[0], 2);
+}
+
+#[test]
+fn driver_battery_replaces_ours() {
+    let rig = Rig::new();
+    let mouse = rig.device(0x00cd);
+    common::wait_for(10, || rig.h.shown(0, Lane::Pointer).is_some());
+    // OpenRazer's driver registers a power supply for the device it bound.
+    let bound = rig.drivers().join("razermouse/0006:1532:00CD.0001");
+    std::fs::create_dir_all(bound.join("power_supply/razer-battery")).unwrap();
+    std::fs::write(bound.join("uevent"), format!("HID_PHYS={}\n", mouse.phys())).unwrap();
+    rig.power_supply_uevent();
+    common::wait_for(10, || rig.h.shown(0, Lane::Pointer).is_none());
+    // The keyboard's stays: the driver made none for it.
+    assert!(rig.h.shown(0, Lane::Keyboard).is_some());
+    std::fs::remove_dir_all(bound.join("power_supply")).unwrap();
+    rig.power_supply_uevent();
+    common::wait_for(10, || rig.h.shown(0, Lane::Pointer).is_some());
 }
 
 #[test]
