@@ -380,7 +380,7 @@ fn driver_handover() {
 }
 
 /// OpenRazer's own driver, which takes virtual devices, loaded in place of
-/// the 3.12.4 patch.
+/// ours.
 fn virtual_drivers(sys: &Path) {
     for driver in ["razermouse", "razerkbd"] {
         let params = sys.join("module").join(driver).join("parameters");

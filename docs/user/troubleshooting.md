@@ -520,8 +520,9 @@ sudo gpasswd -a "$USER" plugdev     # Ubuntu, Debian, Fedora, openSUSE
 ```
 
 The daemon not running, or not listing a device: start it, or restart it.
-OpenRazer 3.12.4's daemon stops taking new devices for good once a device
-it was adding disappears within two seconds, which a quick replug can do.
+openrazer-daemon 3.12.4 and 3.12.5 stop taking new devices for good once a
+device they were adding disappears within two seconds, which a quick replug
+can do.
 A restart brings them back.
 
 ```sh

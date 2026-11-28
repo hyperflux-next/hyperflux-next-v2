@@ -2,7 +2,7 @@
 set -e
 
 if [ "$1" = configure ]; then
-    /usr/lib/dkms/common.postinst openrazer-driver 3.12.4 "" "" "$2"
+    /usr/lib/dkms/common.postinst openrazer-driver 3.12.5 "" "" "$2"
     systemd-sysusers openrazer.conf
     if [ -d /run/systemd/system ]; then
         udevadm control --reload || true

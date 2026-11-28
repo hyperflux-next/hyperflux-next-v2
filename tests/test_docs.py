@@ -135,9 +135,11 @@ def test_doc_numbers(what, doc, pattern, value):
 
 
 def test_openrazer_versions():
-    pinned = assignments("integrations/openrazer/PIN")["OPENRAZER_VERSION"]
-    # What Ubuntu 26.04 LTS and Debian 13 package, named in limitations.md.
-    distributions = {"3.11.0", "3.10.2"}
+    pin = assignments("integrations/openrazer/PIN")
+    pinned = pin["OPENRAZER_VERSION"]
+    # What Ubuntu 26.04 LTS and Debian 13 package, named in limitations.md,
+    # and the daemon of the releases the Debian package is made for.
+    distributions = {"3.11.0", "3.10.2", pin["OPENRAZER_DEBIAN_DAEMON"].split("+")[0]}
     for doc in USER_DOCS:
         for version in re.findall(r"\b3\.\d{1,2}\.\d{1,2}\b", read(doc)):
             assert version in {pinned} | distributions, f"{doc} names OpenRazer {version}, the pin is {pinned}"

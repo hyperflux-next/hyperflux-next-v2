@@ -17,10 +17,10 @@ set -euo pipefail
 
 target=${1%%-*} release=${1#"${1%%-*}"} version=$2 pkgs=/dist/$1
 release=${release#-}
-openrazer=3.12.4
+openrazer=3.12.5
 # Daemon releases checked against this driver. 3.12.5 changed the daemon's
-# version string and nothing else, and Fedora and openSUSE ship it.
-daemons=("$openrazer" 3.12.5)
+# version string and nothing else, and Arch, Debian and Ubuntu ship 3.12.4.
+daemons=("$openrazer" 3.12.4)
 group=plugdev
 stock=(openrazer-daemon python3-openrazer)
 units=/usr/lib/systemd/system rules=/usr/lib/udev/rules.d

@@ -2,8 +2,8 @@
 
 //! The contract between the bridge's virtual OpenRazer devices and the
 //! OpenRazer kernel drivers. There are two, told apart by a read-only
-//! module parameter ([`Contract`]): this project's patch for OpenRazer
-//! 3.12.4 (integrations/openrazer/), and OpenRazer's virtual devices, which
+//! module parameter ([`Contract`]): this project's patch for an OpenRazer
+//! release (integrations/openrazer/), and OpenRazer's virtual devices, which
 //! integrations/openrazer/next/ carries until OpenRazer has them.
 //!
 //! Either driver trusts a HID device as a route only if all of this holds:
@@ -35,7 +35,7 @@ pub const MAX_LABEL_LEN: usize = 24;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Contract {
-    /// The patch for 3.12.4. It reads [`envelope`] replies as errnos.
+    /// This project's patch. It reads [`envelope`] replies as errnos.
     #[default]
     Native,
     /// OpenRazer's virtual devices. A GET with no response fails, and the

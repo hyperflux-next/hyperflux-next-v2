@@ -47,13 +47,13 @@ Depends: dkms,
          udev,
          ${misc:Depends}
 Provides: hyperflux-next-openrazer-driver-dkms (= ${binary:Version}),
-          hyperflux-openrazer-driver-abi (= 3.12.4),
+          hyperflux-openrazer-driver-abi (= 3.12.5),
           openrazer-driver-dkms (= 3.12.4+dfsg-1),
           openrazer-kernel-modules-dkms
 Conflicts: hyperflux-next-openrazer-driver-dkms, openrazer-driver-dkms, openrazer-kernel-modules-dkms
 Replaces: hyperflux-next-openrazer-driver-dkms, openrazer-driver-dkms, openrazer-kernel-modules-dkms
 Description: OpenRazer driver sources with the HyperFlux Next V2 transport, for DKMS
- OpenRazer 3.12.4's kernel drivers with the patches that let them drive
+ OpenRazer 3.12.5's kernel drivers with the patches that let them drive
  the devices HyperFlux Next V2 offers. It takes the place of the
  distribution's openrazer-driver-dkms, so the stock openrazer-daemon
  installs on top of it.

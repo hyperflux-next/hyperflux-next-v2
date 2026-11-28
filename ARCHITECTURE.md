@@ -41,7 +41,7 @@ device table and the OpenRazer route constants. Then the device catalog,
   status, devices, battery and watch; doctor, report and support-bundle;
   bench, capture, stall-check and probe receiver.
 - The patched OpenRazer drivers (`integrations/openrazer`) run in the
-  kernel. They are OpenRazer 3.12.4's `razerkbd` and `razermouse`, changed
+  kernel. They are OpenRazer 3.12.5's `razerkbd` and `razermouse`, changed
   to accept the bridge's virtual devices as well.
 - The OpenRGB plugin (`integrations/openrgb`) loads inside OpenRGB. It shows
   the receiver's devices as OpenRGB controllers and adds a battery page.
@@ -349,7 +349,7 @@ The loaded module shows the prefix in the read-only parameter
 `virtual_phys`, and `modinfo -F parm` lists that parameter without its
 value, which is what Doctor checks in the installed file. The bridge reads
 both parameters of each module and makes each device for the contract its
-driver has (`Contract` in `openrazer.rs`). A template for the 3.12.4 patch
+driver has (`Contract` in `openrazer.rs`). A template for our own patch
 goes to the keeper exactly as before the field existed, so a keeper and a
 bridge from either side of an update still agree.
 
@@ -399,7 +399,7 @@ Missing files are skipped.
   `HFXNERR1`.
 
 Each device's command list holds every command (class, id, data sizes) that
-OpenRazer 3.12.4 or OpenRGB 1.1 sends it, including the queries OpenRGB
+OpenRazer 3.12.5 or OpenRGB 1.1 sends it, including the queries OpenRGB
 makes while it builds a controller:
 
 - 0f/81 with 80 bytes
@@ -573,8 +573,11 @@ OpenRazer drivers.
 Upstream pins are `KEY=value` lines, readable by make and by sh alike.
 `integrations/openrazer/PIN` has:
 
-- `OPENRAZER_VERSION=3.12.4`
-- `OPENRAZER_COMMIT=1ef8a91712906a89fd332a2ed62bbd105315d6d1`
+- `OPENRAZER_VERSION=3.12.5`
+- `OPENRAZER_COMMIT=f7626d0003e03a43f7ea8b449140c81426dc3eb2`
+- `OPENRAZER_DEBIAN_DAEMON=3.12.4+dfsg-1`, the `openrazer-driver-dkms`
+  version the Debian package provides: Debian's and Ubuntu's daemon
+  depends on exactly its own version
 - `OPENRAZER_REPO=https://github.com/openrazer/openrazer.git`
 
 `integrations/openrgb/PIN` has:
@@ -1517,7 +1520,7 @@ keyboard input.
 
 ### Device catalog
 
-Every device that OpenRazer 3.12.4 or OpenRGB 1.1 can drive gets a route.
+Every device that OpenRazer 3.12.5 or OpenRGB 1.1 can drive gets a route.
 The tier says what's known: `tested` through the receiver, `checked` against
 Razer's list and the upstream drivers, or `listed` when neither drives it.
 Razer's side of the check is a dated `[sources]` snapshot, because Razer's

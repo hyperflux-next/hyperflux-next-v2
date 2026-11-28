@@ -245,7 +245,7 @@ def test_openrazer_patch_constants(series, constants):
     for constant in constants:
         value = re.search(rf'pub const {constant}: &str = "([^"]+)";', source).group(1)
         assert value in text, constant
-    # Only the 3.12.4 patch reads the envelope.
+    # Only our own series reads the envelope.
     assert ("HFXNERR1" in text) == (series == "patches")
     descriptor = re.search(r"pub const DESCRIPTOR: \[u8; 19\] = \[(.*?)\];", source, re.S).group(1)
     # Comments like "// Usage Page (0xff00)" would otherwise add bytes.

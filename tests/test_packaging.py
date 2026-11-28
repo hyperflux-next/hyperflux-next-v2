@@ -61,7 +61,11 @@ def test_openrazer_pin():
     spec = read("packaging/rpm/hyperflux-next-v2.spec")
     assert f"%global openrazer_version {version}\n" in spec
     assert f"%global openrazer_commit {commit}\n" in spec
-    assert f"openrazer-driver-dkms (= {version}+dfsg-1)" in read("packaging/debian/control")
+    # Debian's daemon wants its own version of the driver package, which can
+    # trail the pin while the daemon is the same apart from its version.
+    debian = openrazer["OPENRAZER_DEBIAN_DAEMON"]
+    assert f"openrazer-driver-dkms (= {debian})" in read("packaging/debian/control")
+    assert f"hyperflux-openrazer-driver-abi (= {version})" in read("packaging/debian/control")
     for script in ("postinst", "prerm"):
         assert version in read(f"packaging/debian/hyperflux-next-v2-openrazer-driver-dkms.{script}")
     assert f"openrazer={version}\n" in read("scripts/install-test.sh")

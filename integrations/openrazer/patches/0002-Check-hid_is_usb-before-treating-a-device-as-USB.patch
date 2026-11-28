@@ -19,7 +19,7 @@ razer_can_bind(), which now asks hid_is_usb() instead of the bus field.
 Those devices have no input report, so raw_event and the input callbacks
 never run for them.
 
-Applies to OpenRazer 3.12.4 (1ef8a91712906a89fd332a2ed62bbd105315d6d1)
+Applies to OpenRazer 3.12.5 (f7626d0003e03a43f7ea8b449140c81426dc3eb2)
 after 0001.
 
 diff --git a/driver/razeraccessory_driver.c b/driver/razeraccessory_driver.c
@@ -61,7 +61,7 @@ index 9c17c82..346b20a 100644
      if(dev == NULL) {
          dev_err(&intf->dev, "out of memory\n");
 diff --git a/driver/razercommon.c b/driver/razercommon.c
-index 4208a5e..fc4c271 100644
+index 429b51b..82b58e6 100644
 --- a/driver/razercommon.c
 +++ b/driver/razercommon.c
 @@ -350,12 +350,15 @@ static bool razer_is_hyperflux(struct hid_device *hdev)
@@ -82,10 +82,10 @@ index 4208a5e..fc4c271 100644
      if (!razer_is_hyperflux(hdev))
          return false;
 diff --git a/driver/razerkbd_driver.c b/driver/razerkbd_driver.c
-index 5cad825..cd6692a 100644
+index 8f05b81..fd8bf0c 100644
 --- a/driver/razerkbd_driver.c
 +++ b/driver/razerkbd_driver.c
-@@ -5030,7 +5030,7 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
+@@ -5018,7 +5018,7 @@ static void razer_kbd_init(struct razer_kbd_device *dev, struct usb_interface *i
  static int razer_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
  {
      int retval = 0;
@@ -117,10 +117,10 @@ index 551167d..a752b9c 100644
      if(dev == NULL) {
          dev_err(&intf->dev, "out of memory\n");
 diff --git a/driver/razermouse_driver.c b/driver/razermouse_driver.c
-index bab2c10..c08602f 100644
+index 957165d..5f2cfd4 100644
 --- a/driver/razermouse_driver.c
 +++ b/driver/razermouse_driver.c
-@@ -6089,7 +6089,7 @@ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interfac
+@@ -6092,7 +6092,7 @@ static void razer_mouse_init(struct razer_mouse_device *dev, struct usb_interfac
  static int razer_mouse_probe(struct hid_device *hdev, const struct hid_device_id *id)
  {
      int retval = 0;

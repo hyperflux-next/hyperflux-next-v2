@@ -736,7 +736,7 @@ fn module(system: &System, name: &'static str) -> Module {
     let loaded = system
         .is_dir(&dir)
         .then(|| identity(system.read(&format!("{dir}/srcversion"))));
-    // The 3.12.4 patch has a tag and a parameter. OpenRazer's virtual
+    // Our patch has a tag and a parameter. OpenRazer's virtual
     // devices have the parameter alone, which modinfo lists without its value.
     let tag = system.run(&format!("modinfo -F {CAPABILITY_NAME} {name}"));
     let parms = system
@@ -1621,9 +1621,9 @@ fn openrazer_advice(state: &str, missing: &str) -> (String, String) {
             "openrazer-daemon isn't running for this login.".into(),
             "Start it: systemctl --user enable --now openrazer-daemon.service".into(),
         ),
-        // In openrazer-daemon 3.12.4, the thread that adds devices dies when one
-        // leaves during its 2 s wait, and nothing is added after that until
-        // the daemon restarts.
+        // In openrazer-daemon 3.12.4 and 3.12.5, the thread that adds devices
+        // dies when one leaves during its 2 s wait, and nothing is added after
+        // that until the daemon restarts.
         "devices missing" => (
             format!(
                 "openrazer-daemon runs but hasn't listed {missing}, which the bridge \

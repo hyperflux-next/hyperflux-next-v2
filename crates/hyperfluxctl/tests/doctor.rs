@@ -725,7 +725,7 @@ fn openrazer_modules() {
 #[test]
 fn virtual_device_driver() {
     let machine = Machine::with_full();
-    // OpenRazer's virtual devices in place of the 3.12.4 patch: a parameter,
+    // OpenRazer's virtual devices in place of our patch: a parameter,
     // which modinfo lists without its value, and no tag.
     for module in ["razerkbd", "razermouse"] {
         let runner = &machine.runner;

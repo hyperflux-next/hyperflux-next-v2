@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# OpenRazer 3.12.4 with the HyperFlux Next V2 transport: the patched source
-# tree in .upstreams/openrazer, its tests, and the files the
+# The OpenRazer release in PIN with the HyperFlux Next V2 transport: the
+# patched source tree in .upstreams/openrazer, its tests, and the files the
 # openrazer-driver-dkms and full packages install. Paths come from the
 # top-level Makefile.
 
@@ -58,8 +58,9 @@ openrazer-test: openrazer-tree
 	$(PYTHON) -m pytest -q tests/test_device_tables.py tests/test_upstream_tables.py -k openrazer
 
 # The DKMS tree is upstream's, unchanged apart from the patches. Its DKMS
-# name and version stay openrazer-driver 3.12.4. The group in the udev
-# files is set here because distributions disagree on it.
+# name and version stay OpenRazer's (openrazer-driver, the release in PIN).
+# The group in the udev files is set here because distributions disagree
+# on it.
 install-openrazer-dkms-tree: openrazer-tree
 	install -d $(OPENRAZER_DKMS_TREE)/driver $(OPENRAZER_DKMS_TREE)/LICENSES
 	install -m0644 $(OPENRAZER_TREE)/Makefile $(OPENRAZER_DKMS_TREE)/Makefile

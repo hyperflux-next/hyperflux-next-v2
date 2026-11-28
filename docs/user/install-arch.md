@@ -127,7 +127,7 @@ hidraw driver.
 
 - `hyperflux-next-v2-linux`: the bridge, its device keeper,
   `hyperfluxctl`, units, users and udev rules (Core)
-- `hyperflux-next-v2-openrazer-driver-dkms`: OpenRazer 3.12.4's drivers
+- `hyperflux-next-v2-openrazer-driver-dkms`: OpenRazer 3.12.5's drivers
   with the HyperFlux Next V2 patches, in place of `openrazer-driver-dkms`
 - `hyperflux-next-v2-openrgb-plugin`: the OpenRGB plugin
 - `hyperflux-next-v2-full`: the OpenRazer rules and module list (Full)

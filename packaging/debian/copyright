@@ -12,7 +12,7 @@ Copyright: 2015-2016 Terri Cain <terri@dolphincorp.co.uk>
            2015-2016 Gabriele Musco <emaildigabry@gmail.com>
            OpenRazer contributors
 License: GPL-2.0-or-later
-Comment: OpenRazer 3.12.4, patched for the HyperFlux Next V2 transport.
+Comment: OpenRazer 3.12.5, patched for the HyperFlux Next V2 transport.
  Shipped as DKMS sources in hyperflux-next-v2-openrazer-driver-dkms.
 
 Files: .upstreams/openrgb-*/*

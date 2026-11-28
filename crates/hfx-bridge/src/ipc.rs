@@ -108,7 +108,7 @@ pub enum ToKeeper {
 pub enum Template {
     /// The feature-only device the OpenRazer drivers bind, for the
     /// contract the loaded driver takes. A template from a bridge older
-    /// than the field means the 3.12.4 patch, and one for it is sent the
+    /// than the field means our own patch, and one for it is sent the
     /// old way, so a keeper and a bridge either side of an update agree.
     #[serde(rename = "openrazer")]
     OpenRazer {
@@ -299,7 +299,7 @@ mod tests {
         else {
             panic!("{create}")
         };
-        // Without the field it's the 3.12.4 patch, and that's how it goes out
+        // Without the field it's our own patch, and that's how it goes out
         // again, so a keeper from before the field still takes it.
         let Template::OpenRazer { contract, .. } = &template else {
             panic!("{template:?}")
